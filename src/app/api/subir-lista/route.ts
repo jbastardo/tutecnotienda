@@ -7,6 +7,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const supplierId = formData.get("supplierId") as string | null;
+    const margin = parseFloat(formData.get("margin") as string) || 0.4;
 
     if (!file) {
       return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
@@ -29,8 +30,8 @@ export async function POST(request: Request) {
 
     const buffer = await file.arrayBuffer();
 
-    console.log(`[SubirLista] Procesando ${file.name} (${(buffer.byteLength / 1024).toFixed(0)} KB)`);
-    const result = await processUploadedFile(supplierId, file.name, buffer);
+    console.log(`[SubirLista] Procesando ${file.name} (${(buffer.byteLength / 1024).toFixed(0)} KB) con margen ${margin}%`);
+    const result = await processUploadedFile(supplierId, file.name, buffer, margin / 100);
 
     const priceList = await prisma.priceList.findUnique({
       where: { id: result.priceListId },

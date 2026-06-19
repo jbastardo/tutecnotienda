@@ -5,7 +5,6 @@ export interface FilteredProduct extends ParsedProduct {
   profit: number;
   margin: number;
   selected: boolean;
-  available?: number;
 }
 
 export const DEFAULT_MARGIN = 0.4;
@@ -15,7 +14,10 @@ export function calculateProduct(
   product: ParsedProduct,
   margin: number = DEFAULT_MARGIN
 ): FilteredProduct {
-  const sellPrice = product.cost * (1 + margin);
+  // Use explicit sellPrice if provided, otherwise calculate from cost
+  const sellPrice = product.sellPrice
+    ? product.sellPrice
+    : product.cost * (1 + margin);
   const profit = sellPrice - product.cost;
 
   return {
@@ -24,8 +26,6 @@ export function calculateProduct(
     profit: Math.round(profit * 100) / 100,
     margin,
     selected: profit > MIN_PROFIT_THRESHOLD,
-    category: product.category,
-    available: product.available,
   };
 }
 

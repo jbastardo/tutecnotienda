@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2 } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Search } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface Supplier {
@@ -15,10 +15,13 @@ interface PriceListProduct {
   sku: string | null;
   name: string;
   description: string | null;
+  category: string | null;
   cost: number;
   sellPrice: number;
   profit: number;
   selected: boolean;
+  available: number;
+  imageUrl: string | null;
 }
 
 interface PriceList {
@@ -42,6 +45,8 @@ export default function SubirListaPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState("");
+  const [margin, setMargin] = useState("40");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   useEffect(() => {
     fetch("/api/proveedores")
@@ -74,6 +79,7 @@ export default function SubirListaPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("supplierId", selectedSupplier);
+    formData.append("margin", margin);
 
     const res = await fetch("/api/subir-lista", {
       method: "POST",
@@ -168,7 +174,7 @@ export default function SubirListaPage() {
               <div className="flex items-center gap-3">
                 <label className="flex flex-1 cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 px-4 py-6 hover:border-blue-400 hover:bg-blue-50/50">
                   <FileSpreadsheet className="h-8 w-8 text-gray-400" />
-                  <div>
+            <div>
                     <p className="text-sm font-medium text-gray-700">
                       {file ? file.name : "Seleccionar archivo"}
                     </p>

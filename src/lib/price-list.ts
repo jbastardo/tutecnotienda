@@ -6,7 +6,8 @@ import type { Prisma } from "@prisma/client";
 export async function processUploadedFile(
   supplierId: string,
   fileName: string,
-  buffer: ArrayBuffer
+  buffer: ArrayBuffer,
+  customMargin?: number
 ) {
   const supplier = await prisma.supplier.findUnique({
     where: { id: supplierId },
@@ -29,7 +30,8 @@ export async function processUploadedFile(
     throw new Error(errors.join("; "));
   }
 
-  const processedProducts = processPriceList(products, DEFAULT_MARGIN);
+  const margin = customMargin ?? DEFAULT_MARGIN;
+  const processedProducts = processPriceList(products, margin);
 
   const priceList = await prisma.priceList.create({
     data: {
@@ -52,6 +54,7 @@ export async function processUploadedFile(
     margin: p.margin,
     selected: p.selected,
     available: p.available || 0,
+    imageUrl: p.imageUrl || null,
     rawData: p.rawData as unknown as Prisma.InputJsonValue,
   }));
 

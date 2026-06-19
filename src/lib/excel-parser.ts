@@ -10,7 +10,9 @@ export interface ParsedProduct {
   description?: string;
   category?: string;
   cost: number;
+  sellPrice?: number;
   available?: number;
+  imageUrl?: string;
   rawData: ExcelRow;
 }
 
@@ -56,23 +58,34 @@ function parseValue(
   transform?: string | null
 ): string | number {
   if (value === undefined || value === null) return "";
+  
+  // If it's already a number, return as number for numeric transforms, otherwise string
   if (typeof value === "number") {
-    return transform === "number" || transform === "currency" ? value : String(value);
+    return transform === "number" || transform === "currency" || !transform ? value : String(value);
   }
+  
   if (typeof value === "string") {
-    if (transform === "number" || transform === "currency") {
+    if (transform === "number" || transform === "currency" || !transform) {
+      // Try to parse as number even without explicit transform
       const cleaned = value.replace(/[^0-9.,-]/g, "").replace(",", ".");
       const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
+      // Return number if it parsed cleanly and no transform was set (auto-detect)
+      // or if transform explicitly requests number
+      if (!isNaN(num) && (transform || cleaned === value.replace(",", "."))) {
+        return num;
+      }
+      return isNaN(num) ? (transform ? 0 : value.trim()) : num;
     }
     return value.trim();
   }
+  
   if (typeof value === "object" && "w" in value) {
     const str = String(value.w ?? value.v ?? "");
-    if (transform === "number" || transform === "currency") {
+    if (transform === "number" || transform === "currency" || !transform) {
       const cleaned = str.replace(/[^0-9.,-]/g, "").replace(",", ".");
       const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
+      if (!isNaN(num)) return num;
+      return transform ? 0 : str.trim();
     }
     return str.trim();
   }
@@ -113,6 +126,8 @@ export function parseExcel(
   const catMapping = mappings.find((m) => m.key === "category");
   const costMapping = mappings.find((m) => m.key === "cost");
   const availMapping = mappings.find((m) => m.key === "available");
+  const priceMapping = mappings.find((m) => m.key === "sellPrice");
+  const imgMapping = mappings.find((m) => m.key === "imageUrl");
 
   const nameIdx = nameMapping ? findColumnIndex(headers, nameMapping) : null;
   const skuIdx = skuMapping ? findColumnIndex(headers, skuMapping) : null;
@@ -120,6 +135,8 @@ export function parseExcel(
   const catIdx = catMapping ? findColumnIndex(headers, catMapping) : null;
   const costIdx = costMapping ? findColumnIndex(headers, costMapping) : null;
   const availIdx = availMapping ? findColumnIndex(headers, availMapping) : null;
+  const priceIdx = priceMapping ? findColumnIndex(headers, priceMapping) : null;
+  const imgIdx = imgMapping ? findColumnIndex(headers, imgMapping) : null;
 
   if (nameIdx === null) errors.push(`Columna 'name' no encontrada. Headers: ${headers.slice(0, 20).join(", ")}`);
   if (costIdx === null) errors.push(`Columna 'cost' no encontrada. Headers: ${headers.slice(0, 20).join(", ")}`);
@@ -156,7 +173,9 @@ export function parseExcel(
       description: descIdx !== null ? String(parseValue(rowArr[descIdx], descMapping?.transform)) : undefined,
       category: catIdx !== null ? String(parseValue(rowArr[catIdx], catMapping?.transform)) : undefined,
       cost: typeof cost === "number" ? cost : 0,
+      sellPrice: priceIdx !== null ? Number(parseValue(rowArr[priceIdx], "number")) || undefined : undefined,
       available: available > 0 ? available : undefined,
+      imageUrl: imgIdx !== null ? String(parseValue(rowArr[imgIdx])) || undefined : undefined,
       rawData,
     });
   }
