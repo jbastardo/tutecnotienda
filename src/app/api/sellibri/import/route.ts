@@ -1,0 +1,82 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { fetchAllProducts, isConfigured } from "@/lib/sellibri";
+
+export async function POST(request: Request) {
+  if (!isConfigured()) {
+    return NextResponse.json(
+      { error: "Sellibri no configurado" },
+      { status: 400 }
+    );
+  }
+
+  const body = await request.json();
+  const { supplierId } = body;
+
+  if (!supplierId) {
+    return NextResponse.json(
+      { error: "Selecciona un proveedor para asociar los productos importados" },
+      { status: 400 }
+    );
+  }
+
+  const supplier = await prisma.supplier.findUnique({ where: { id: supplierId } });
+  if (!supplier) {
+    return NextResponse.json({ error: "Proveedor no encontrado" }, { status: 404 });
+  }
+
+  let imported = 0;
+  let skipped = 0;
+  let errors: string[] = [];
+
+  const allProducts = await fetchAllProducts((page, total) => {
+    console.log(`[Import] Pagina ${page}/${total}`);
+  });
+
+  for (const sp of allProducts) {
+    try {
+      const existing = await prisma.product.findFirst({
+        where: {
+          OR: [
+            { sellibriId: String(sp.sellibriId) },
+            ...(sp.sku ? [{ sku: sp.sku }] : []),
+          ],
+        },
+      });
+
+      if (existing) {
+        skipped++;
+        continue;
+      }
+
+      await prisma.product.create({
+        data: {
+          name: sp.title,
+          description: sp.description || null,
+          sku: sp.sku || null,
+          cost: sp.cost,
+          sellPrice: sp.price,
+          profit: sp.price - sp.cost,
+          margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
+          supplierId,
+          sellibriId: String(sp.sellibriId),
+          sellibriUrl: `https://${process.env.SELLIBRI_STORE_DOMAIN}/products/${sp.slug}`,
+          synced: true,
+          status: "published",
+          images: sp.images,
+        },
+      });
+
+      imported++;
+    } catch (e) {
+      errors.push(`Error con ${sp.title}: ${e}`);
+    }
+  }
+
+  return NextResponse.json({
+    total: allProducts.length,
+    imported,
+    skipped,
+    errors: errors.slice(0, 10),
+  });
+}

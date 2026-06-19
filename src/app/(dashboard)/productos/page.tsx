@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, Search, RefreshCw, Trash2, ExternalLink } from "lucide-react";
+import { Upload, Search, RefreshCw, Trash2, ExternalLink, Download } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface Product {
@@ -20,15 +20,28 @@ interface Product {
   createdAt: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "synced" | "pending">("all");
   const [syncing, setSyncing] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [importSupplierId, setImportSupplierId] = useState("");
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     fetchProducts();
+    fetch("/api/proveedores")
+      .then((r) => r.json())
+      .then((d) => setSuppliers(Array.isArray(d) ? d : []));
   }, [filter]);
 
   const fetchProducts = async () => {
@@ -70,6 +83,32 @@ export default function ProductosPage() {
     fetchProducts();
   };
 
+  const handleImport = async () => {
+    if (!importSupplierId) return;
+    setImporting(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/sellibri/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: importSupplierId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(
+          `Importacion: ${data.imported} nuevos, ${data.skipped} ya existian (total: ${data.total})`
+        );
+        setShowImport(false);
+        fetchProducts();
+      } else {
+        setMessage(data.error || "Error al importar");
+      }
+    } catch {
+      setMessage("Error de conexion");
+    }
+    setImporting(false);
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -79,7 +118,68 @@ export default function ProductosPage() {
             Productos seleccionados para publicar en tu tienda
           </p>
         </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowImport(!showImport)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4" />
+            Importar de Sellibri
+          </button>
+        </div>
       </div>
+
+      {showImport && (
+        <div className="mt-4 rounded-xl border bg-white p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">
+            Importar productos existentes de Sellibri
+          </h3>
+          <p className="text-sm text-gray-500 mb-3">
+            Esto traera todos los productos que ya tienes publicados en tu
+            tienda. Selecciona el proveedor al que pertenecen.
+          </p>
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Proveedor
+              </label>
+              <select
+                value={importSupplierId}
+                onChange={(e) => setImportSupplierId(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="">Seleccionar proveedor...</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleImport}
+              disabled={!importSupplierId || importing}
+              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              {importing ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {importing ? "Importando..." : "Importar"}
+            </button>
+          </div>
+          {suppliers.length === 0 && (
+            <p className="mt-3 text-xs text-amber-600">
+              No hay proveedores.{" "}
+              <a href="/proveedores/nuevo" className="underline">
+                Crea uno primero
+              </a>
+              .
+            </p>
+          )}
+        </div>
+      )}
 
       {message && (
         <div

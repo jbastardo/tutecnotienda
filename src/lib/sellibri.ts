@@ -238,8 +238,80 @@ export async function searchOrGenerateDescription(
 }
 
 export async function publishProduct(productId: string): Promise<boolean> {
-  // Sellibri usa el estado 'active' para publicar
-  // En la creacion ya se manda status: 'active' si es necesario
   console.log(`[Sellibri] Publicando producto ID: ${productId}`);
   return true;
+}
+
+export interface ImportedProduct {
+  sellibriId: number;
+  title: string;
+  slug: string;
+  status: string;
+  description: string | null;
+  price: number;
+  cost: number;
+  sku: string | null;
+  variantId: number;
+  images: string[];
+}
+
+export async function fetchAllProducts(
+  onProgress?: (page: number, total: number) => void
+): Promise<ImportedProduct[]> {
+  if (!isConfigured()) {
+    console.log("[Sellibri] No configurado - no se puede importar");
+    return [];
+  }
+
+  const baseUrl = getBaseUrl();
+  const allProducts: ImportedProduct[] = [];
+  let page = 1;
+
+  while (true) {
+    await new Promise((r) => setTimeout(r, 300));
+
+    const res = await fetch(`${baseUrl}/products?page=${page}`, {
+      headers: headers(),
+    });
+
+    if (!res.ok) {
+      console.error(`[Sellibri] Error pagina ${page}: ${res.status}`);
+      break;
+    }
+
+    const data = await res.json();
+    const products = data.products || [];
+
+    for (const p of products) {
+      const masterVariant = (p.all_variants || []).find(
+        (v: { is_master: boolean }) => v.is_master
+      );
+      const images: string[] = (p.all_variants || [])
+        .flatMap((v: { images?: Array<{ image?: string }> }) => v.images || [])
+        .map((img: { image?: string }) => img.image || "")
+        .filter((url: string) => !!url);
+
+      allProducts.push({
+        sellibriId: p.id,
+        title: p.title || "",
+        slug: p.slug || "",
+        status: p.status || "active",
+        description: null,
+        price: masterVariant ? parseFloat(masterVariant.price) || 0 : 0,
+        cost: masterVariant ? parseFloat(masterVariant.cost) || 0 : 0,
+        sku: masterVariant?.sku || null,
+        variantId: masterVariant?.id || 0,
+        images: [...new Set(images)],
+      });
+    }
+
+    const meta = data.meta || {};
+    const totalPages = meta.total_pages || 1;
+    onProgress?.(page, totalPages);
+
+    if (page >= totalPages) break;
+    page++;
+  }
+
+  return allProducts;
 }
