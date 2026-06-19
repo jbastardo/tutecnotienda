@@ -41,10 +41,33 @@ let config: SellibriConfig = {
 function getBaseUrl(): string {
   if (config.apiUrl) return config.apiUrl.replace(/\/+$/, "");
   if (config.storeDomain) {
-    const domain = config.storeDomain.replace(/\/+$/, "");
-    return `https://${domain}/api/v1`;
+    const domain = config.storeDomain.replace(/\/+$/, "").replace(/^https?:\/\//, "");
+    const url = `https://${domain}/api/v1`;
+    return url;
   }
   return "";
+}
+
+function getAlternativeUrls(): string[] {
+  const urls: string[] = [];
+  const base = getBaseUrl();
+  if (base) urls.push(base);
+
+  if (config.storeDomain) {
+    const domain = config.storeDomain.replace(/\/+$/, "").replace(/^https?:\/\//, "");
+    // Try tiendasellibri subdomain
+    if (!domain.includes("tiendasellibri.com")) {
+      const name = domain.split(".")[0];
+      urls.push(`https://${name}.tiendasellibri.com/api/v1`);
+    }
+    // Try vendabo subdomain
+    if (!domain.includes("vendabo.com")) {
+      const name = domain.split(".")[0];
+      urls.push(`https://${name}.vendabo.com/api/v1`);
+    }
+  }
+
+  return [...new Set(urls)];
 }
 
 function headers(): Record<string, string> {
@@ -255,6 +278,24 @@ export interface ImportedProduct {
   images: string[];
 }
 
+async function findWorkingUrl(): Promise<string | null> {
+  const urls = getAlternativeUrls();
+  for (const url of urls) {
+    try {
+      const res = await fetch(`${url}/products?page=1`, {
+        headers: headers(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.products || data.meta) return url;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 export async function fetchAllProducts(
   onProgress?: (page: number, total: number) => void
 ): Promise<{ products: ImportedProduct[]; error?: string }> {
@@ -262,7 +303,12 @@ export async function fetchAllProducts(
     return { products: [], error: "Sellibri no configurado. Revisa SELLIBRI_API_KEY y SELLIBRI_STORE_DOMAIN" };
   }
 
-  const baseUrl = getBaseUrl();
+  const baseUrl = await findWorkingUrl();
+  if (!baseUrl) {
+    return { products: [], error: "No se pudo conectar a la API de Sellibri. Verifica el dominio y API key." };
+  }
+
+  console.log(`[Sellibri] Usando API: ${baseUrl}`);
   const allProducts: ImportedProduct[] = [];
   let page = 1;
 
@@ -328,27 +374,37 @@ export async function fetchAllProducts(
   return { products: allProducts };
 }
 
-export async function testConnection(): Promise<{ ok: boolean; error?: string; productCount?: number }> {
+export async function testConnection(): Promise<{ ok: boolean; error?: string; productCount?: number; url?: string }> {
   if (!isConfigured()) {
     return { ok: false, error: "No configurado" };
   }
 
-  const baseUrl = getBaseUrl();
-  try {
-    const res = await fetch(`${baseUrl}/products?page=1`, {
-      headers: headers(),
-    });
+  const urls = getAlternativeUrls();
 
-    if (!res.ok) {
-      return { ok: false, error: `HTTP ${res.status}` };
+  for (const baseUrl of urls) {
+    try {
+      const res = await fetch(`${baseUrl}/products?page=1`, {
+        headers: headers(),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        if (text.startsWith("{")) {
+          return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}`, url: baseUrl };
+        }
+        continue;
+      }
+
+      const data = await res.json();
+      return {
+        ok: true,
+        productCount: data.meta?.total_count || (data.products || []).length,
+        url: baseUrl,
+      };
+    } catch {
+      continue;
     }
-
-    const data = await res.json();
-    return {
-      ok: true,
-      productCount: data.meta?.total_count || (data.products || []).length,
-    };
-  } catch (e) {
-    return { ok: false, error: `Error: ${e}` };
   }
+
+  return { ok: false, error: "Ninguna URL de API funciono. Verifica el dominio de tu tienda." };
 }
