@@ -107,6 +107,9 @@ export default function ProductosPage() {
         setMessage(
           `Importacion: ${data.imported} nuevos, ${data.skipped} ya existian (total: ${data.total})`
         );
+        if (data.errors?.length > 0) {
+          setMessage((m) => m + ` - ${data.errors[0]}`);
+        }
         setShowImport(false);
         fetchProducts();
       } else {
@@ -116,6 +119,14 @@ export default function ProductosPage() {
       setMessage("Error de conexion");
     }
     setImporting(false);
+  };
+
+  const fixUrls = async () => {
+    setMessage("Corrigiendo URLs...");
+    const res = await fetch("/api/sellibri/fix-urls", { method: "POST" });
+    const data = await res.json();
+    setMessage(data.ok ? `URLs corregidas: ${data.fixed}` : data.error || "Error");
+    if (res.ok) fetchProducts();
   };
 
   return (
@@ -134,6 +145,12 @@ export default function ProductosPage() {
           >
             <Download className="h-4 w-4" />
             Importar de Sellibri
+          </button>
+          <button
+            onClick={fixUrls}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
+          >
+            Corregir URLs
           </button>
         </div>
       </div>
@@ -241,9 +258,13 @@ export default function ProductosPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-gray-900">{p.name}</h3>
-                    {p.sku && (
+                    {p.sku ? (
                       <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-gray-600">
                         {p.sku}
+                      </span>
+                    ) : (
+                      <span className="rounded bg-gray-50 px-2 py-0.5 text-xs text-gray-400">
+                        sin SKU
                       </span>
                     )}
                     <span
