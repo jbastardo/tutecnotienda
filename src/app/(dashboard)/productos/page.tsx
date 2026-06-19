@@ -123,10 +123,21 @@ export default function ProductosPage() {
 
   const fixUrls = async () => {
     setMessage("Corrigiendo URLs...");
-    const res = await fetch("/api/sellibri/fix-urls", { method: "POST" });
-    const data = await res.json();
-    setMessage(data.ok ? `URLs corregidas: ${data.fixed}` : data.error || "Error");
-    if (res.ok) fetchProducts();
+    try {
+      const res = await fetch("/api/sellibri/fix-urls", { 
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`URLs corregidas: ${data.fixed}. Dominio: ${data.storeDomain}`);
+        fetchProducts();
+      } else {
+        setMessage(`Error: ${data.error || res.status}`);
+      }
+    } catch (e) {
+      setMessage(`Error de conexion: ${e}`);
+    }
   };
 
   return (
