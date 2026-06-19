@@ -17,6 +17,12 @@ export async function POST(request: Request) {
     );
   }
 
+  const storeDomain =
+    process.env.SELLIBRI_STORE_DOMAIN ||
+    (process.env.SELLIBRI_API_URL
+      ? new URL(process.env.SELLIBRI_API_URL).hostname
+      : "tutecnotienda.com");
+
   const product = await prisma.product.findUnique({
     where: { id: productId },
     include: { supplier: true },
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
     data: {
       sellibriId: String(result.id),
       sellibriUrl: variantId
-        ? `https://${process.env.SELLIBRI_STORE_DOMAIN || "tienda"}/products/${result.slug}`
+        ? `https://${storeDomain}/products/${result.slug}`
         : null,
       synced: true,
       status: "published",

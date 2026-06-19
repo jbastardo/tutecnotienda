@@ -10,6 +10,12 @@ export async function POST(request: Request) {
     );
   }
 
+  const storeDomain =
+    process.env.SELLIBRI_STORE_DOMAIN ||
+    (process.env.SELLIBRI_API_URL
+      ? new URL(process.env.SELLIBRI_API_URL).hostname
+      : "tutecnotienda.com");
+
   const body = await request.json();
   const { supplierId } = body;
 
@@ -60,7 +66,7 @@ export async function POST(request: Request) {
           margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
           supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
-          sellibriUrl: `https://${process.env.SELLIBRI_STORE_DOMAIN}/products/${sp.slug}`,
+          sellibriUrl: `https://${storeDomain}/products/${sp.slug}`,
           synced: true,
           status: "published",
           images: sp.images,

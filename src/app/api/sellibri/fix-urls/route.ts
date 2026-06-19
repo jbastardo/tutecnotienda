@@ -7,7 +7,11 @@ export async function POST() {
     return NextResponse.json({ error: "Sellibri no configurado" }, { status: 400 });
   }
 
-  const storeDomain = process.env.SELLIBRI_STORE_DOMAIN || "tutecnotienda.com";
+  const storeDomain =
+    process.env.SELLIBRI_STORE_DOMAIN ||
+    (process.env.SELLIBRI_API_URL
+      ? new URL(process.env.SELLIBRI_API_URL).hostname
+      : "tutecnotienda.com");
 
   // Re-fetch product slugs from Sellibri
   const result = await fetchAllProducts();
