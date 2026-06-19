@@ -17,9 +17,15 @@ export async function POST(request: Request) {
   let skipped = 0;
   let errors: string[] = [];
 
-  const allProducts = await fetchAllProducts((page, total) => {
+  const result = await fetchAllProducts((page, total) => {
     console.log(`[Import] Pagina ${page}/${total}`);
   });
+
+  if (result.error && result.products.length === 0) {
+    return NextResponse.json({ error: result.error }, { status: 500 });
+  }
+
+  const allProducts = result.products;
 
   for (const sp of allProducts) {
     try {

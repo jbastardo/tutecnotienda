@@ -257,61 +257,98 @@ export interface ImportedProduct {
 
 export async function fetchAllProducts(
   onProgress?: (page: number, total: number) => void
-): Promise<ImportedProduct[]> {
+): Promise<{ products: ImportedProduct[]; error?: string }> {
   if (!isConfigured()) {
-    console.log("[Sellibri] No configurado - no se puede importar");
-    return [];
+    return { products: [], error: "Sellibri no configurado. Revisa SELLIBRI_API_KEY y SELLIBRI_STORE_DOMAIN" };
   }
 
   const baseUrl = getBaseUrl();
   const allProducts: ImportedProduct[] = [];
   let page = 1;
 
-  while (true) {
-    await new Promise((r) => setTimeout(r, 300));
+  try {
+    while (true) {
+      await new Promise((r) => setTimeout(r, 300));
 
-    const res = await fetch(`${baseUrl}/products?page=${page}`, {
+      const url = `${baseUrl}/products?page=${page}`;
+      console.log(`[Sellibri] Fetching ${url}`);
+
+      let res: Response;
+      try {
+        res = await fetch(url, { headers: headers() });
+      } catch (e) {
+        return { products: [], error: `Error de conexion: ${e}. URL: ${url}` };
+      }
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        return {
+          products: allProducts,
+          error: `HTTP ${res.status} en pagina ${page}: ${text.slice(0, 200)}`,
+        };
+      }
+
+      const data = await res.json();
+      const products = data.products || [];
+
+      for (const p of products) {
+        const masterVariant = (p.all_variants || []).find(
+          (v: { is_master: boolean }) => v.is_master
+        );
+        const images: string[] = (p.all_variants || [])
+          .flatMap((v: { images?: Array<{ image?: string }> }) => v.images || [])
+          .map((img: { image?: string }) => img.image || "")
+          .filter((url: string) => !!url);
+
+        allProducts.push({
+          sellibriId: p.id,
+          title: p.title || "",
+          slug: p.slug || "",
+          status: p.status || "active",
+          description: null,
+          price: masterVariant ? parseFloat(masterVariant.price) || 0 : 0,
+          cost: masterVariant ? parseFloat(masterVariant.cost) || 0 : 0,
+          sku: masterVariant?.sku || null,
+          variantId: masterVariant?.id || 0,
+          images: [...new Set(images)],
+        });
+      }
+
+      const meta = data.meta || {};
+      const totalPages = meta.total_pages || 1;
+      onProgress?.(page, totalPages);
+
+      if (page >= totalPages) break;
+      page++;
+    }
+  } catch (e) {
+    return { products: allProducts, error: `Error inesperado: ${e}` };
+  }
+
+  return { products: allProducts };
+}
+
+export async function testConnection(): Promise<{ ok: boolean; error?: string; productCount?: number }> {
+  if (!isConfigured()) {
+    return { ok: false, error: "No configurado" };
+  }
+
+  const baseUrl = getBaseUrl();
+  try {
+    const res = await fetch(`${baseUrl}/products?page=1`, {
       headers: headers(),
     });
 
     if (!res.ok) {
-      console.error(`[Sellibri] Error pagina ${page}: ${res.status}`);
-      break;
+      return { ok: false, error: `HTTP ${res.status}` };
     }
 
     const data = await res.json();
-    const products = data.products || [];
-
-    for (const p of products) {
-      const masterVariant = (p.all_variants || []).find(
-        (v: { is_master: boolean }) => v.is_master
-      );
-      const images: string[] = (p.all_variants || [])
-        .flatMap((v: { images?: Array<{ image?: string }> }) => v.images || [])
-        .map((img: { image?: string }) => img.image || "")
-        .filter((url: string) => !!url);
-
-      allProducts.push({
-        sellibriId: p.id,
-        title: p.title || "",
-        slug: p.slug || "",
-        status: p.status || "active",
-        description: null,
-        price: masterVariant ? parseFloat(masterVariant.price) || 0 : 0,
-        cost: masterVariant ? parseFloat(masterVariant.cost) || 0 : 0,
-        sku: masterVariant?.sku || null,
-        variantId: masterVariant?.id || 0,
-        images: [...new Set(images)],
-      });
-    }
-
-    const meta = data.meta || {};
-    const totalPages = meta.total_pages || 1;
-    onProgress?.(page, totalPages);
-
-    if (page >= totalPages) break;
-    page++;
+    return {
+      ok: true,
+      productCount: data.meta?.total_count || (data.products || []).length,
+    };
+  } catch (e) {
+    return { ok: false, error: `Error: ${e}` };
   }
-
-  return allProducts;
 }
