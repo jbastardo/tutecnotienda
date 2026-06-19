@@ -347,13 +347,18 @@ export async function fetchAllProducts(
       const products = data.products || [];
 
       for (const p of products) {
-        const masterVariant = (p.all_variants || []).find(
-          (v: { is_master: boolean }) => v.is_master
-        );
-        const images: string[] = (p.all_variants || [])
+        const variants = p.all_variants || [];
+        const masterVariant =
+          variants.find((v: { is_master: boolean }) => v.is_master) ||
+          variants[0];
+
+        const images: string[] = variants
           .flatMap((v: { images?: Array<{ image?: string }> }) => v.images || [])
           .map((img: { image?: string }) => img.image || "")
           .filter((url: string) => !!url);
+
+        const price = masterVariant ? Number(masterVariant.price) || 0 : 0;
+        const cost = masterVariant ? Number(masterVariant.cost) || 0 : 0;
 
         allProducts.push({
           sellibriId: p.id,
@@ -361,8 +366,8 @@ export async function fetchAllProducts(
           slug: p.slug || "",
           status: p.status || "active",
           description: null,
-          price: masterVariant ? parseFloat(masterVariant.price) || 0 : 0,
-          cost: masterVariant ? parseFloat(masterVariant.cost) || 0 : 0,
+          price,
+          cost,
           sku: masterVariant?.sku || null,
           variantId: masterVariant?.id || 0,
           images: [...new Set(images)],

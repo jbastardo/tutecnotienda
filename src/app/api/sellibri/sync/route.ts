@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     data: {
       sellibriId: String(result.id),
       sellibriUrl: variantId
-        ? `https://${storeDomain}/products/${result.slug}`
+        ? `https://${storeDomain}/p/${result.slug}`
         : null,
       synced: true,
       status: "published",

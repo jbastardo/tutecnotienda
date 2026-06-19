@@ -62,7 +62,7 @@ export async function POST(request: Request) {
           margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
           supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
-          sellibriUrl: `https://${storeDomain}/products/${sp.slug}`,
+          sellibriUrl: `https://${storeDomain}/p/${sp.slug}`,
           synced: true,
           status: "published",
           images: sp.images,

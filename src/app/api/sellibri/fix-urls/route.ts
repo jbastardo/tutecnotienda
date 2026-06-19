@@ -41,7 +41,7 @@ export async function POST() {
       slugMap.get(String(p.sellibriId)) ||
       p.sellibriUrl?.split("/products/")[1] ||
       p.sellibriId;
-    const newUrl = `https://${storeDomain}/products/${slug}`;
+    const newUrl = `https://${storeDomain}/p/${slug}`;
     if (p.sellibriUrl !== newUrl) {
       await prisma.product.update({
         where: { id: p.id },
