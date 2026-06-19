@@ -31,8 +31,20 @@ function findColumnIndex(
     return mapping.columnIndex;
   }
   if (mapping.columnName) {
-    const idx = headers.findIndex(
-      (h) => h.trim().toLowerCase() === mapping.columnName!.trim().toLowerCase()
+    const target = mapping.columnName.trim().toLowerCase();
+    // First try exact match
+    let idx = headers.findIndex(
+      (h) => h.trim().toLowerCase() === target
+    );
+    if (idx !== -1) return idx;
+    // Try without special chars
+    idx = headers.findIndex(
+      (h) => h.trim().toLowerCase().replace(/[^a-z0-9áéíóúñ ]/g, "") === target.replace(/[^a-z0-9áéíóúñ ]/g, "")
+    );
+    if (idx !== -1) return idx;
+    // Try contains
+    idx = headers.findIndex(
+      (h) => h.trim().toLowerCase().includes(target) || target.includes(h.trim().toLowerCase())
     );
     if (idx !== -1) return idx;
   }
@@ -109,8 +121,8 @@ export function parseExcel(
   const costIdx = costMapping ? findColumnIndex(headers, costMapping) : null;
   const availIdx = availMapping ? findColumnIndex(headers, availMapping) : null;
 
-  if (nameIdx === null) errors.push("Columna 'name' no encontrada");
-  if (costIdx === null) errors.push("Columna 'cost' no encontrada");
+  if (nameIdx === null) errors.push(`Columna 'name' no encontrada. Headers: ${headers.slice(0, 20).join(", ")}`);
+  if (costIdx === null) errors.push(`Columna 'cost' no encontrada. Headers: ${headers.slice(0, 20).join(", ")}`);
 
   if (nameIdx === null || costIdx === null) {
     return { products: [], errors };
