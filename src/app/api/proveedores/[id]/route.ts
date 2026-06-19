@@ -24,7 +24,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, description, active, mappings } = body;
+  const { name, description, active, mappings, skipRows, sheetName } = body;
 
   const supplier = await prisma.supplier.findUnique({ where: { id } });
   if (!supplier) {
@@ -40,6 +40,8 @@ export async function PUT(
           key: m.key,
           columnName: m.columnName ?? null,
           columnIndex: m.columnIndex ?? null,
+          skipRows: skipRows ?? 0,
+          sheetName: sheetName || null,
         })
       ),
     });

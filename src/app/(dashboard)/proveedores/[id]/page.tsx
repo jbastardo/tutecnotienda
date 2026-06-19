@@ -37,6 +37,8 @@ export default function EditarProveedorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [skipRows, setSkipRows] = useState(0);
+  const [sheetName, setSheetName] = useState("");
 
   useEffect(() => {
     const id = params.id as string;
@@ -60,6 +62,8 @@ export default function EditarProveedorPage() {
           };
         });
         setSupplier({ ...data, mappings: merged });
+        setSkipRows(data.mappings?.[0]?.skipRows || 0);
+        setSheetName(data.mappings?.[0]?.sheetName || "");
       })
       .catch(() => setError("Error al cargar"))
       .finally(() => setLoading(false));
@@ -87,6 +91,8 @@ export default function EditarProveedorPage() {
         name: supplier.name,
         active: supplier.active,
         description: supplier.description,
+        skipRows,
+        sheetName,
         mappings: supplier.mappings
           .filter((m) => m.columnName)
           .map((m) => ({
@@ -154,6 +160,36 @@ export default function EditarProveedorPage() {
         <p className="mt-1 text-xs text-gray-500">
           Nombre exacto de cada columna en el Excel del proveedor
         </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Filas a saltar (cabeceras)
+            </label>
+            <input
+              type="number"
+              value={skipRows}
+              onChange={(e) => setSkipRows(Number(e.target.value))}
+              min={0}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Si el Excel tiene filas de titulo o datos extra antes de los encabezados
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hoja (opcional)
+            </label>
+            <input
+              type="text"
+              value={sheetName}
+              onChange={(e) => setSheetName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+              placeholder="Hoja1"
+            />
+          </div>
+        </div>
 
         <div className="mt-4 space-y-3">
           {supplier.mappings.map((mapping) => {
