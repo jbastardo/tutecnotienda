@@ -20,6 +20,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ storeDomain, apiUrl, totalProducts: count, sample });
   }
 
+  if (mode === "raw") {
+    const baseUrl = `https://tutecnotienda.com/api/v1`;
+    const res = await fetch(`${baseUrl}/products?per_page=1&page=1`, {
+      headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
+    });
+    const text = await res.text();
+    return NextResponse.json({ status: res.status, raw: JSON.parse(text) });
+  }
+
   const result = await testConnection();
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
 }
