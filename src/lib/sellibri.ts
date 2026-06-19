@@ -55,16 +55,14 @@ function getAlternativeUrls(): string[] {
 
   if (config.storeDomain) {
     const domain = config.storeDomain.replace(/\/+$/, "").replace(/^https?:\/\//, "");
-    // Try tiendasellibri subdomain
-    if (!domain.includes("tiendasellibri.com")) {
-      const name = domain.split(".")[0];
-      urls.push(`https://${name}.tiendasellibri.com/api/v1`);
-    }
-    // Try vendabo subdomain
-    if (!domain.includes("vendabo.com")) {
-      const name = domain.split(".")[0];
-      urls.push(`https://${name}.vendabo.com/api/v1`);
-    }
+    const name = domain.split(".")[0];
+
+    urls.push(`https://${name}.tiendasellibri.com/api/v1`);
+    urls.push(`https://${name}.vendabo.com/api/v1`);
+    urls.push(`https://${name}.tiendasellibri.com/api`);
+    urls.push(`https://${name}.vendabo.com/api`);
+    urls.push(`https://api.tiendasellibri.com/api/v1`);
+    urls.push(`https://api.sellibri.com/v1`);
   }
 
   return [...new Set(urls)];
@@ -374,37 +372,46 @@ export async function fetchAllProducts(
   return { products: allProducts };
 }
 
-export async function testConnection(): Promise<{ ok: boolean; error?: string; productCount?: number; url?: string }> {
+export async function testConnection(): Promise<{ ok: boolean; error?: string; productCount?: number; url?: string; tried?: string[] }> {
   if (!isConfigured()) {
     return { ok: false, error: "No configurado" };
   }
 
   const urls = getAlternativeUrls();
+  const tried: string[] = [];
 
   for (const baseUrl of urls) {
+    const fullUrl = `${baseUrl}/products?page=1`;
+    tried.push(fullUrl);
     try {
-      const res = await fetch(`${baseUrl}/products?page=1`, {
+      const res = await fetch(fullUrl, {
         headers: headers(),
       });
 
+      const text = await res.text().catch(() => "");
+
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
         if (text.startsWith("{")) {
-          return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}`, url: baseUrl };
+          return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}`, url: baseUrl, tried };
         }
         continue;
       }
 
-      const data = await res.json();
-      return {
-        ok: true,
-        productCount: data.meta?.total_count || (data.products || []).length,
-        url: baseUrl,
-      };
+      if (text.startsWith("{")) {
+        const data = JSON.parse(text);
+        return {
+          ok: true,
+          productCount: data.meta?.total_count || (data.products || []).length,
+          url: baseUrl,
+          tried,
+        };
+      }
+
+      continue;
     } catch {
       continue;
     }
   }
 
-  return { ok: false, error: "Ninguna URL de API funciono. Verifica el dominio de tu tienda." };
+  return { ok: false, error: "Ninguna URL funciono. Revisa el panel de Sellibri > Ajustes > API para la URL correcta.", tried };
 }
