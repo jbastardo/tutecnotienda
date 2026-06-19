@@ -21,12 +21,17 @@ export async function GET(request: Request) {
   }
 
   if (mode === "raw") {
-    const baseUrl = `https://tutecnotienda.com/api/v1`;
+    const baseUrl = "https://tutecnotienda.com/api/v1";
     const res = await fetch(`${baseUrl}/products?per_page=1&page=1`, {
-      headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
+      headers: {
+        "X-Api-Key": process.env.SELLIBRI_API_KEY || "",
+        "Content-Type": "application/json",
+      },
     });
     const text = await res.text();
-    return NextResponse.json({ status: res.status, raw: JSON.parse(text) });
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = { error: "no es JSON", preview: text.slice(0, 500) }; }
+    return NextResponse.json({ status: res.status, raw: parsed });
   }
 
   const result = await testConnection();
