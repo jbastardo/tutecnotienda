@@ -58,6 +58,7 @@ model PriceListProduct {
   sku         String?
   name        String
   description String?
+  category    String?
   cost        Decimal   @db.Decimal(10, 2)
   sellPrice   Decimal   @db.Decimal(10, 2)
   profit      Decimal   @db.Decimal(10, 2)

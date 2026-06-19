@@ -45,6 +45,7 @@ export async function processUploadedFile(
     sku: p.sku || null,
     name: p.name,
     description: p.description || null,
+    category: p.category || null,
     cost: p.cost,
     sellPrice: p.sellPrice,
     profit: p.profit,

@@ -24,6 +24,8 @@ export function calculateProduct(
     profit: Math.round(profit * 100) / 100,
     margin,
     selected: profit > MIN_PROFIT_THRESHOLD,
+    category: product.category,
+    available: product.available,
   };
 }
 

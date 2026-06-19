@@ -8,6 +8,7 @@ export interface ParsedProduct {
   name: string;
   sku?: string;
   description?: string;
+  category?: string;
   cost: number;
   available?: number;
   rawData: ExcelRow;
@@ -97,12 +98,14 @@ export function parseExcel(
   const nameMapping = mappings.find((m) => m.key === "name");
   const skuMapping = mappings.find((m) => m.key === "sku");
   const descMapping = mappings.find((m) => m.key === "description");
+  const catMapping = mappings.find((m) => m.key === "category");
   const costMapping = mappings.find((m) => m.key === "cost");
   const availMapping = mappings.find((m) => m.key === "available");
 
   const nameIdx = nameMapping ? findColumnIndex(headers, nameMapping) : null;
   const skuIdx = skuMapping ? findColumnIndex(headers, skuMapping) : null;
   const descIdx = descMapping ? findColumnIndex(headers, descMapping) : null;
+  const catIdx = catMapping ? findColumnIndex(headers, catMapping) : null;
   const costIdx = costMapping ? findColumnIndex(headers, costMapping) : null;
   const availIdx = availMapping ? findColumnIndex(headers, availMapping) : null;
 
@@ -139,6 +142,7 @@ export function parseExcel(
       name: String(name),
       sku: skuIdx !== null ? String(parseValue(rowArr[skuIdx], skuMapping?.transform)) : undefined,
       description: descIdx !== null ? String(parseValue(rowArr[descIdx], descMapping?.transform)) : undefined,
+      category: catIdx !== null ? String(parseValue(rowArr[catIdx], catMapping?.transform)) : undefined,
       cost: typeof cost === "number" ? cost : 0,
       available: available > 0 ? available : undefined,
       rawData,
