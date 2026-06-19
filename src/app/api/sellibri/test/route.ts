@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { testConnection } from "@/lib/sellibri";
+import { testConnection, getStoreDomain } from "@/lib/sellibri";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -7,12 +7,7 @@ export async function GET(request: Request) {
   const mode = url.searchParams.get("mode");
 
   if (mode === "db") {
-    const storeDomain =
-      process.env.SELLIBRI_STORE_DOMAIN ||
-      (process.env.SELLIBRI_API_URL
-        ? new URL(process.env.SELLIBRI_API_URL).hostname
-        : "(no configurado)");
-
+    const storeDomain = getStoreDomain();
     const apiUrl = process.env.SELLIBRI_API_URL || "(no seteado)";
     const count = await prisma.product.count().catch(() => -1);
     const sample = await prisma.product

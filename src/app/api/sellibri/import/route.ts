@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts, isConfigured } from "@/lib/sellibri";
+import { fetchAllProducts, isConfigured, getStoreDomain } from "@/lib/sellibri";
 
 export async function POST(request: Request) {
   if (!isConfigured()) {
@@ -10,11 +10,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const storeDomain =
-    process.env.SELLIBRI_STORE_DOMAIN ||
-    (process.env.SELLIBRI_API_URL
-      ? new URL(process.env.SELLIBRI_API_URL).hostname
-      : "tutecnotienda.com");
+  const storeDomain = getStoreDomain();
 
   const body = await request.json();
   const { supplierId } = body;

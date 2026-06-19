@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts, isConfigured } from "@/lib/sellibri";
+import { fetchAllProducts, isConfigured, getStoreDomain } from "@/lib/sellibri";
 
 export async function GET() {
-  const storeDomain =
-    process.env.SELLIBRI_STORE_DOMAIN ||
-    (process.env.SELLIBRI_API_URL
-      ? new URL(process.env.SELLIBRI_API_URL).hostname
-      : "tutecnotienda.com");
-
+  const storeDomain = getStoreDomain();
   const sample = await prisma.product.findMany({
     where: { sellibriId: { not: null } },
     select: { id: true, name: true, sellibriUrl: true },
     take: 3,
   });
-
   return NextResponse.json({ storeDomain, sample });
 }
 
@@ -23,11 +17,7 @@ export async function POST() {
     return NextResponse.json({ error: "Sellibri no configurado" }, { status: 400 });
   }
 
-  const storeDomain =
-    process.env.SELLIBRI_STORE_DOMAIN ||
-    (process.env.SELLIBRI_API_URL
-      ? new URL(process.env.SELLIBRI_API_URL).hostname
-      : "tutecnotienda.com");
+  const storeDomain = getStoreDomain();
 
   // Try to get real slugs from Sellibri
   let slugMap = new Map<string, string>();

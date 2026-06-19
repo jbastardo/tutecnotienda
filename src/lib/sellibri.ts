@@ -38,12 +38,23 @@ let config: SellibriConfig = {
   storeDomain: process.env.SELLIBRI_STORE_DOMAIN || "",
 };
 
+export function getStoreDomain(): string {
+  // Preferir extraer el dominio de la API URL (mas confiable)
+  if (config.apiUrl) {
+    try { return new URL(config.apiUrl).hostname; } catch {}
+  }
+  // Fallback a storeDomain si no es el placeholder default
+  if (config.storeDomain && !config.storeDomain.includes("tutienda.com")) {
+    return config.storeDomain;
+  }
+  return "tutecnotienda.com";
+}
+
 function getBaseUrl(): string {
   if (config.apiUrl) return config.apiUrl.replace(/\/+$/, "");
   if (config.storeDomain) {
     const domain = config.storeDomain.replace(/\/+$/, "").replace(/^https?:\/\//, "");
-    const url = `https://${domain}/api/v1`;
-    return url;
+    return `https://${domain}/api/v1`;
   }
   return "";
 }

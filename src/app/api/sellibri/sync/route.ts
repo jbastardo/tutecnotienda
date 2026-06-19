@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProductVariant, searchProductImages, isConfigured } from "@/lib/sellibri";
+import { createProduct, updateProductVariant, searchProductImages, isConfigured, getStoreDomain } from "@/lib/sellibri";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -17,11 +17,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const storeDomain =
-    process.env.SELLIBRI_STORE_DOMAIN ||
-    (process.env.SELLIBRI_API_URL
-      ? new URL(process.env.SELLIBRI_API_URL).hostname
-      : "tutecnotienda.com");
+  const storeDomain = getStoreDomain();
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
