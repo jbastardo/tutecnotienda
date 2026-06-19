@@ -194,34 +194,55 @@ export default function EditarProveedorPage() {
         <div className="mt-4 space-y-3">
           {supplier.mappings.map((mapping) => {
             const mk = MAPPING_KEYS.find((k) => k.key === mapping.key)!;
+            const colLetter = mapping.columnIndex !== null && mapping.columnIndex !== undefined
+              ? String.fromCharCode(65 + mapping.columnIndex)
+              : "";
             return (
               <div
                 key={mapping.key}
                 className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
               >
-                <span className="w-32 text-sm font-medium text-gray-700">
+                <span className="w-36 text-sm font-medium text-gray-700">
                   {mk.label}
                   {mk.required && (
                     <span className="ml-1 text-red-500">*</span>
                   )}
                 </span>
-                <span className="text-xs text-gray-400">&rarr;</span>
                 <input
                   type="text"
                   value={mapping.columnName || ""}
                   onChange={(e) =>
                     updateMapping(mapping.key, e.target.value)
                   }
-                  className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  placeholder={
-                    mk.key === "name"
-                      ? "DESCRIPCION"
-                      : mk.key === "cost"
-                        ? "PRECIO $"
-                        : ""
-                  }
-                  required={mk.required}
+                  className="w-40 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="Nombre columna"
                 />
+                <span className="text-xs text-gray-400">o</span>
+                <input
+                  type="text"
+                  value={colLetter}
+                  onChange={(e) => {
+                    const letter = e.target.value.toUpperCase().replace(/[^A-Z]/g, "");
+                    const idx = letter ? letter.charCodeAt(0) - 65 : null;
+                    if (!supplier) return;
+                    setSupplier({
+                      ...supplier,
+                      mappings: supplier.mappings.map((m) =>
+                        m.key === mapping.key
+                          ? { ...m, columnIndex: idx }
+                          : m
+                      ),
+                    });
+                  }}
+                  className="w-14 rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm text-center text-gray-900 font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="A"
+                  maxLength={2}
+                />
+                {colLetter && (
+                  <span className="text-xs text-gray-400">
+                    col {colLetter}
+                  </span>
+                )}
               </div>
             );
           })}
