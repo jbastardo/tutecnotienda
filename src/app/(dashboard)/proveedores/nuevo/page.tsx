@@ -10,6 +10,7 @@ const DEFAULT_MAPPING_KEYS = [
   { key: "sku", label: "SKU / Codigo", required: false },
   { key: "cost", label: "Costo / Precio", required: true },
   { key: "description", label: "Descripcion", required: false },
+  { key: "available", label: "Stock disponible", required: false },
 ];
 
 export default function NuevoProveedorPage() {

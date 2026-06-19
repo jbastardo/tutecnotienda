@@ -5,6 +5,7 @@ export interface FilteredProduct extends ParsedProduct {
   profit: number;
   margin: number;
   selected: boolean;
+  available?: number;
 }
 
 export const DEFAULT_MARGIN = 0.4;

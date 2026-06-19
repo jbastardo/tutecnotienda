@@ -50,6 +50,7 @@ export async function processUploadedFile(
     profit: p.profit,
     margin: p.margin,
     selected: p.selected,
+    available: p.available || 0,
     rawData: p.rawData as unknown as Prisma.InputJsonValue,
   }));
 

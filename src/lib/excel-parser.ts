@@ -9,6 +9,7 @@ export interface ParsedProduct {
   sku?: string;
   description?: string;
   cost: number;
+  available?: number;
   rawData: ExcelRow;
 }
 
@@ -97,11 +98,13 @@ export function parseExcel(
   const skuMapping = mappings.find((m) => m.key === "sku");
   const descMapping = mappings.find((m) => m.key === "description");
   const costMapping = mappings.find((m) => m.key === "cost");
+  const availMapping = mappings.find((m) => m.key === "available");
 
   const nameIdx = nameMapping ? findColumnIndex(headers, nameMapping) : null;
   const skuIdx = skuMapping ? findColumnIndex(headers, skuMapping) : null;
   const descIdx = descMapping ? findColumnIndex(headers, descMapping) : null;
   const costIdx = costMapping ? findColumnIndex(headers, costMapping) : null;
+  const availIdx = availMapping ? findColumnIndex(headers, availMapping) : null;
 
   if (nameIdx === null) errors.push("Columna 'name' no encontrada");
   if (costIdx === null) errors.push("Columna 'cost' no encontrada");
@@ -123,6 +126,7 @@ export function parseExcel(
 
     const name = parseValue(rowArr[nameIdx], nameMapping?.transform);
     const cost = parseValue(rowArr[costIdx], costMapping?.transform);
+    const available = availIdx !== null ? parseInt(String(parseValue(rowArr[availIdx], "number"))) || 0 : 0;
 
     if (!name || (typeof cost === "number" && cost <= 0)) continue;
 
@@ -136,6 +140,7 @@ export function parseExcel(
       sku: skuIdx !== null ? String(parseValue(rowArr[skuIdx], skuMapping?.transform)) : undefined,
       description: descIdx !== null ? String(parseValue(rowArr[descIdx], descMapping?.transform)) : undefined,
       cost: typeof cost === "number" ? cost : 0,
+      available: available > 0 ? available : undefined,
       rawData,
     });
   }
