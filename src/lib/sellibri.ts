@@ -280,12 +280,12 @@ async function findWorkingUrl(): Promise<string | null> {
   const urls = getAlternativeUrls();
   for (const url of urls) {
     try {
-      const res = await fetch(`${url}/products?page=1`, {
+      const res = await fetch(`${url}/products?per_page=1&page=1`, {
         headers: headers(),
       });
       if (res.ok) {
-        const data = await res.json();
-        if (data.products || data.meta) return url;
+        const text = await res.text();
+        if (text.startsWith("{")) return url;
       }
     } catch {
       continue;
@@ -314,7 +314,7 @@ export async function fetchAllProducts(
     while (true) {
       await new Promise((r) => setTimeout(r, 300));
 
-      const url = `${baseUrl}/products?page=${page}`;
+      const url = `${baseUrl}/products?per_page=50&page=${page}`;
       console.log(`[Sellibri] Fetching ${url}`);
 
       let res: Response;
@@ -381,7 +381,7 @@ export async function testConnection(): Promise<{ ok: boolean; error?: string; p
   const tried: string[] = [];
 
   for (const baseUrl of urls) {
-    const fullUrl = `${baseUrl}/products?page=1`;
+    const fullUrl = `${baseUrl}/products?per_page=1&page=1`;
     tried.push(fullUrl);
     try {
       const res = await fetch(fullUrl, {
