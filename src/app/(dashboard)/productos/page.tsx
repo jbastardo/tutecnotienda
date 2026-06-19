@@ -122,21 +122,32 @@ export default function ProductosPage() {
   };
 
   const fixUrls = async () => {
-    setMessage("Corrigiendo URLs...");
+    if (!confirm("Esto eliminara los productos importados y los reimportara con las URLs correctas. Continuar?")) return;
+    setMessage("Reimportando...");
     try {
-      const res = await fetch("/api/sellibri/fix-urls", { 
+      // Delete all synced products
+      await fetch("/api/productos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allSynced: true }),
+        credentials: "include",
+      });
+      // Re-import
+      const res = await fetch("/api/sellibri/import", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: importSupplierId }),
         credentials: "include",
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage(`URLs corregidas: ${data.fixed}. Dominio: ${data.storeDomain}`);
+        setMessage(`Reimportados: ${data.imported} productos. URLs corregidas.`);
         fetchProducts();
       } else {
-        setMessage(`Error: ${data.error || res.status}`);
+        setMessage(data.error || "Error al reimportar");
       }
     } catch (e) {
-      setMessage(`Error de conexion: ${e}`);
+      setMessage(`Error: ${e}`);
     }
   };
 

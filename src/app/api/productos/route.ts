@@ -73,7 +73,15 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { id } = await request.json();
+  const { id, allSynced } = await request.json();
+
+  if (allSynced) {
+    const deleted = await prisma.product.deleteMany({
+      where: { synced: true },
+    });
+    return NextResponse.json({ success: true, deleted: deleted.count });
+  }
+
   if (!id) {
     return NextResponse.json({ error: "ID requerido" }, { status: 400 });
   }
