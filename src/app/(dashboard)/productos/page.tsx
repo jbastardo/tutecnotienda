@@ -16,7 +16,8 @@ interface Product {
   sellibriId: string | null;
   sellibriUrl: string | null;
   status: string;
-  supplier: { id: string; name: string; slug: string };
+  supplier: { id: string; name: string; slug: string } | null;
+  supplierId: string | null;
   createdAt: string;
 }
 
@@ -83,6 +84,15 @@ export default function ProductosPage() {
     fetchProducts();
   };
 
+  const updateSupplier = async (productId: string, newSupplierId: string) => {
+    const res = await fetch("/api/productos", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: productId, supplierId: newSupplierId || null }),
+    });
+    if (res.ok) fetchProducts();
+  };
+
   const handleImport = async () => {
     if (!importSupplierId) return;
     setImporting(true);
@@ -135,20 +145,19 @@ export default function ProductosPage() {
             Importar productos existentes de Sellibri
           </h3>
           <p className="text-sm text-gray-500 mb-3">
-            Esto traera todos los productos que ya tienes publicados en tu
-            tienda. Selecciona el proveedor al que pertenecen.
+            Trae todos los productos que ya tienes publicados. Opcional: asigna un proveedor.
           </p>
           <div className="flex items-end gap-3">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Proveedor
+                Proveedor (opcional)
               </label>
               <select
                 value={importSupplierId}
                 onChange={(e) => setImportSupplierId(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
               >
-                <option value="">Seleccionar proveedor...</option>
+                <option value="">Sin proveedor</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -158,7 +167,7 @@ export default function ProductosPage() {
             </div>
             <button
               onClick={handleImport}
-              disabled={!importSupplierId || importing}
+              disabled={importing}
               className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
             >
               {importing ? (
@@ -270,9 +279,23 @@ export default function ProductosPage() {
                     </div>
                   </div>
 
-                  <div className="mt-1 text-xs text-gray-400">
-                    Proveedor: {p.supplier?.name} &middot;{" "}
-                    {new Date(p.createdAt).toLocaleDateString("es-VE")}
+                  <div className="mt-2 flex items-center gap-3 text-xs">
+                    <span className="text-gray-400">Proveedor:</span>
+                    <select
+                      value={p.supplierId || ""}
+                      onChange={(e) => updateSupplier(p.id, e.target.value)}
+                      className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-700"
+                    >
+                      <option value="">Sin proveedor</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-gray-400">
+                      {new Date(p.createdAt).toLocaleDateString("es-VE")}
+                    </span>
                   </div>
                 </div>
 

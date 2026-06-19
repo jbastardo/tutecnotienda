@@ -41,9 +41,9 @@ export async function POST(request: Request) {
     price: Number(product.sellPrice),
     cost: Number(product.cost),
     sku: product.sku || undefined,
-    vendorName: product.supplier.name,
+    vendorName: product.supplier?.name || undefined,
     images,
-    tags: [product.supplier.name.toLowerCase(), "tutecnotienda"],
+    tags: product.supplier?.name ? [product.supplier.name.toLowerCase(), "tutecnotienda"] : ["tutecnotienda"],
     status: "active",
   });
 

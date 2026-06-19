@@ -123,7 +123,7 @@ export default async function DashboardPage() {
                       {product.name}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {product.supplier.name}
+                      {product.supplier?.name || "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-900">
                       {formatCurrency(Number(product.cost))}

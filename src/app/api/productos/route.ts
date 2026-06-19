@@ -56,6 +56,14 @@ export async function POST(request: Request) {
         margin: plp.margin,
         supplierId: plp.priceList.supplierId,
         status: "draft",
+        supplierProducts: {
+          create: {
+            supplierId: plp.priceList.supplierId,
+            cost: plp.cost,
+            profit: plp.profit,
+            supplierSku: plp.sku || null,
+          },
+        },
       },
     });
     created.push(product);
@@ -72,4 +80,20 @@ export async function DELETE(request: Request) {
 
   await prisma.product.delete({ where: { id } });
   return NextResponse.json({ success: true });
+}
+
+export async function PUT(request: Request) {
+  const body = await request.json();
+  const { id, supplierId } = body;
+
+  if (!id) {
+    return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+  }
+
+  const product = await prisma.product.update({
+    where: { id },
+    data: { supplierId: supplierId || null },
+  });
+
+  return NextResponse.json(product);
 }

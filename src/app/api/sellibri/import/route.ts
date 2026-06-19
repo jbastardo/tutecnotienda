@@ -13,18 +13,6 @@ export async function POST(request: Request) {
   const body = await request.json();
   const { supplierId } = body;
 
-  if (!supplierId) {
-    return NextResponse.json(
-      { error: "Selecciona un proveedor para asociar los productos importados" },
-      { status: 400 }
-    );
-  }
-
-  const supplier = await prisma.supplier.findUnique({ where: { id: supplierId } });
-  if (!supplier) {
-    return NextResponse.json({ error: "Proveedor no encontrado" }, { status: 404 });
-  }
-
   let imported = 0;
   let skipped = 0;
   let errors: string[] = [];
@@ -45,6 +33,12 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
+        if (supplierId && !existing.supplierId) {
+          await prisma.product.update({
+            where: { id: existing.id },
+            data: { supplierId },
+          });
+        }
         skipped++;
         continue;
       }
@@ -58,7 +52,7 @@ export async function POST(request: Request) {
           sellPrice: sp.price,
           profit: sp.price - sp.cost,
           margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
-          supplierId,
+          supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
           sellibriUrl: `https://${process.env.SELLIBRI_STORE_DOMAIN}/products/${sp.slug}`,
           synced: true,

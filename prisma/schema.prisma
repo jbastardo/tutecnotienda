@@ -8,16 +8,17 @@ datasource db {
 }
 
 model Supplier {
-  id          String         @id @default(cuid())
-  name        String
-  slug        String         @unique
-  description String?
-  active      Boolean        @default(true)
-  mappings    ExcelMapping[]
-  pricelists  PriceList[]
-  products    Product[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  description      String?
+  active           Boolean           @default(true)
+  mappings         ExcelMapping[]
+  pricelists       PriceList[]
+  products         Product[]
+  supplierProducts SupplierProduct[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model ExcelMapping {
@@ -74,8 +75,8 @@ model Product {
   sellPrice   Decimal  @db.Decimal(10, 2)
   profit      Decimal  @db.Decimal(10, 2)
   margin      Decimal  @db.Decimal(5, 4) @default(0.4000)
-  supplierId  String
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
   sellibriId  String?
   sellibriUrl String?
   synced      Boolean  @default(false)
@@ -83,6 +84,21 @@ model Product {
   status      String   @default("draft")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  supplierProducts SupplierProduct[]
+}
+
+model SupplierProduct {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  cost        Decimal  @db.Decimal(10, 2)
+  profit      Decimal  @db.Decimal(10, 2)
+  supplierSku String?
+  createdAt   DateTime @default(now())
+
+  @@unique([productId, supplierId])
 }
 
 model ApiKey {
