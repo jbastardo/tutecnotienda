@@ -94,7 +94,6 @@ export default function ProductosPage() {
   };
 
   const handleImport = async () => {
-    if (!importSupplierId) return;
     setImporting(true);
     setMessage("");
     try {
