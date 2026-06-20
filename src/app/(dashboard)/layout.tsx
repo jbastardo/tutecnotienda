@@ -7,7 +7,7 @@ import {
   Truck,
   Package,
   LogOut,
-  Sparkles,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,17 +31,15 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-60 flex-col border-r border-border bg-card">
-        <div className="flex h-14 items-center gap-2.5 border-b border-border px-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600">
-            <Sparkles className="h-4 w-4 text-white" />
+      <aside className="flex w-64 flex-col border-r bg-white">
+        <div className="flex h-16 items-center gap-3 border-b px-6">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
+            <Package className="h-5 w-5 text-white" />
           </div>
-          <span className="text-base font-bold text-foreground tracking-tight">
-            Tutecnotienda
-          </span>
+          <span className="text-lg font-bold text-gray-900">Tutecnotienda</span>
         </div>
 
-        <nav className="flex-1 space-y-0.5 px-3 py-4">
+        <nav className="flex-1 space-y-1 p-4">
           {navItems.map((item) => {
             const isActive =
               (item.href === "/" && pathname === "/") ||
@@ -52,31 +50,32 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
               >
-                <item.icon className="h-[18px] w-[18px]" />
+                <item.icon className="h-5 w-5" />
                 {item.label}
+                {isActive && <ChevronRight className="ml-auto h-4 w-4" />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-border px-3 py-3">
+        <div className="border-t p-4">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-red-600"
           >
-            <LogOut className="h-[18px] w-[18px]" />
+            <LogOut className="h-5 w-5" />
             Cerrar sesion
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+      <main className="flex-1 overflow-auto bg-gray-50 p-8">{children}</main>
     </div>
   );
 }
