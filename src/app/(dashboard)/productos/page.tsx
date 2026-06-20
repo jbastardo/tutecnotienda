@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download, LayoutGrid, List } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download, LayoutGrid, List, Package } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { calculatePricing, formatBs, formatUsd } from "@/lib/pricing";
 
@@ -50,6 +50,9 @@ export default function SubirListaPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [rates, setRates] = useState({ bcv: 0, promedio: 0, lastUpdated: "" });
   const [viewMode, setViewMode] = useState<"table" | "grid">("grid");
+  const [showCatalog, setShowCatalog] = useState(true);
+  const [catalogProducts, setCatalogProducts] = useState<any[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/proveedores")
@@ -60,6 +63,18 @@ export default function SubirListaPage() {
       .then((d) => { if (d.bcv > 0) setRates(d); })
       .catch(() => {});
   }, []);
+
+  const fetchCatalog = async () => {
+    setCatalogLoading(true);
+    const res = await fetch("/api/productos?synced=true");
+    const data = await res.json();
+    setCatalogProducts(Array.isArray(data) ? data : []);
+    setCatalogLoading(false);
+  };
+
+  useEffect(() => {
+    if (showCatalog) fetchCatalog();
+  }, [showCatalog]);
 
   useEffect(() => {
     if (priceList) {
@@ -617,6 +632,66 @@ export default function SubirListaPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {!priceList && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Catalogo ({catalogProducts.length} productos en la web)
+            </h2>
+            <button onClick={fetchCatalog} className="text-sm text-blue-600 hover:underline">
+              {catalogLoading ? "Cargando..." : "Refrescar"}
+            </button>
+          </div>
+
+          {catalogLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-gray-300"/></div>
+          ) : catalogProducts.length === 0 ? (
+            <div className="rounded-xl border bg-white p-8 text-center text-sm text-gray-400">
+              No hay productos. Importa desde Sellibri o sube un Excel.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {catalogProducts.map((p: any) => (
+                <div key={p.id} className="rounded-lg border border-gray-200 bg-white p-3 hover:shadow-md transition-shadow">
+                  {p.images?.[0] ? (
+                    <img src={p.images[0]} alt={p.name} className="w-full h-32 object-cover rounded-md mb-2" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-32 bg-gray-100 rounded-md mb-2 flex items-center justify-center text-gray-300">
+                      <Package className="h-8 w-8" />
+                    </div>
+                  )}
+                  <p className="text-xs font-semibold text-gray-900 line-clamp-2 mb-1">{p.name}</p>
+                  {p.sku && <p className="text-xs text-gray-400 font-mono mb-1">{p.sku}</p>}
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-xs text-gray-400">Costo</p>
+                      <p className="text-sm font-semibold text-gray-700">{formatCurrency(Number(p.cost))}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">Venta</p>
+                      <p className="text-sm font-bold text-green-600">{formatCurrency(Number(p.sellPrice))}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    {p.sellibriUrl ? (
+                      <a href={p.sellibriUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-500 hover:underline">Ver en web</a>
+                    ) : (
+                      <span className="text-xs text-gray-300">Sin publicar</span>
+                    )}
+                    {p.synced ? (
+                      <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Publicado</span>
+                    ) : (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pendiente</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
