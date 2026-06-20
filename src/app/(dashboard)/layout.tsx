@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Truck,
   Package,
-  Upload,
   LogOut,
   ChevronRight,
 } from "lucide-react";
@@ -16,7 +15,6 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/proveedores", label: "Proveedores", icon: Truck },
   { href: "/productos", label: "Productos", icon: Package },
-  { href: "/subir-lista", label: "Subir Lista", icon: Upload },
 ];
 
 export default function DashboardLayout({
