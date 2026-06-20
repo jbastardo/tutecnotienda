@@ -22,13 +22,18 @@ interface Supplier {
 }
 
 const MAPPING_KEYS = [
-  { key: "name", label: "Nombre del producto", required: true },
+  { key: "name", label: "Nombre", required: true },
   { key: "sku", label: "SKU / Codigo", required: false },
-  { key: "cost", label: "Costo / Precio", required: true },
-  { key: "sellPrice", label: "Precio de venta", required: false },
+  { key: "cost", label: "Costo", required: true },
+  { key: "sellPrice", label: "Precio venta", required: false },
+  { key: "comparePrice", label: "Precio comparacion", required: false },
+  { key: "brand", label: "Marca / Fabricante", required: false },
   { key: "category", label: "Categoria", required: false },
-  { key: "available", label: "Stock disponible", required: false },
-  { key: "imageUrl", label: "URL de imagen", required: false },
+  { key: "available", label: "Stock", required: false },
+  { key: "imageUrl", label: "URL imagen", required: false },
+  { key: "barcode", label: "Codigo barras", required: false },
+  { key: "tags", label: "Etiquetas", required: false },
+  { key: "weight", label: "Peso", required: false },
   { key: "description", label: "Descripcion", required: false },
 ];
 

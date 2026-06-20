@@ -58,14 +58,19 @@ model PriceListProduct {
   sku          String?
   name         String
   description  String?
+  brand        String?
   category     String?
   cost         Decimal   @db.Decimal(10, 2)
   sellPrice    Decimal   @db.Decimal(10, 2)
+  comparePrice Decimal   @db.Decimal(10, 2)  @default(0.00)
   profit       Decimal   @db.Decimal(10, 2)
-  margin       Decimal   @db.Decimal(5, 4) @default(0.4000)
+  margin       Decimal   @db.Decimal(5, 4)   @default(0.4000)
   selected     Boolean   @default(false)
   available    Int       @default(0)
   imageUrl     String?
+  barcode      String?
+  tags         String?
+  weight       Decimal?  @db.Decimal(8, 2)
   rawData      Json?
 }
 

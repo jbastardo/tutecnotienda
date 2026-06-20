@@ -8,11 +8,16 @@ export interface ParsedProduct {
   name: string;
   sku?: string;
   description?: string;
+  brand?: string;
   category?: string;
   cost: number;
   sellPrice?: number;
+  comparePrice?: number;
   available?: number;
   imageUrl?: string;
+  barcode?: string;
+  tags?: string;
+  weight?: number;
   rawData: ExcelRow;
 }
 
@@ -124,19 +129,29 @@ export function parseExcel(
   const skuMapping = mappings.find((m) => m.key === "sku");
   const descMapping = mappings.find((m) => m.key === "description");
   const catMapping = mappings.find((m) => m.key === "category");
+  const brandMapping = mappings.find((m) => m.key === "brand");
   const costMapping = mappings.find((m) => m.key === "cost");
   const availMapping = mappings.find((m) => m.key === "available");
   const priceMapping = mappings.find((m) => m.key === "sellPrice");
+  const cmpPriceMapping = mappings.find((m) => m.key === "comparePrice");
   const imgMapping = mappings.find((m) => m.key === "imageUrl");
+  const barcodeMapping = mappings.find((m) => m.key === "barcode");
+  const tagsMapping = mappings.find((m) => m.key === "tags");
+  const weightMapping = mappings.find((m) => m.key === "weight");
 
   const nameIdx = nameMapping ? findColumnIndex(headers, nameMapping) : null;
   const skuIdx = skuMapping ? findColumnIndex(headers, skuMapping) : null;
   const descIdx = descMapping ? findColumnIndex(headers, descMapping) : null;
   const catIdx = catMapping ? findColumnIndex(headers, catMapping) : null;
+  const brandIdx = brandMapping ? findColumnIndex(headers, brandMapping) : null;
   const costIdx = costMapping ? findColumnIndex(headers, costMapping) : null;
   const availIdx = availMapping ? findColumnIndex(headers, availMapping) : null;
   const priceIdx = priceMapping ? findColumnIndex(headers, priceMapping) : null;
+  const cmpPriceIdx = cmpPriceMapping ? findColumnIndex(headers, cmpPriceMapping) : null;
   const imgIdx = imgMapping ? findColumnIndex(headers, imgMapping) : null;
+  const barcodeIdx = barcodeMapping ? findColumnIndex(headers, barcodeMapping) : null;
+  const tagsIdx = tagsMapping ? findColumnIndex(headers, tagsMapping) : null;
+  const weightIdx = weightMapping ? findColumnIndex(headers, weightMapping) : null;
 
   if (nameIdx === null) errors.push(`Columna 'name' no encontrada. Headers: ${headers.slice(0, 20).join(", ")}`);
   if (costIdx === null) errors.push(`Columna 'cost' no encontrada. Headers: ${headers.slice(0, 20).join(", ")}`);
@@ -171,11 +186,16 @@ export function parseExcel(
       name: String(name),
       sku: skuIdx !== null ? String(parseValue(rowArr[skuIdx], skuMapping?.transform)) : undefined,
       description: descIdx !== null ? String(parseValue(rowArr[descIdx], descMapping?.transform)) : undefined,
+      brand: brandIdx !== null ? String(parseValue(rowArr[brandIdx], brandMapping?.transform)) : undefined,
       category: catIdx !== null ? String(parseValue(rowArr[catIdx], catMapping?.transform)) : undefined,
       cost: typeof cost === "number" ? cost : 0,
       sellPrice: priceIdx !== null ? Number(parseValue(rowArr[priceIdx], "number")) || undefined : undefined,
+      comparePrice: cmpPriceIdx !== null ? Number(parseValue(rowArr[cmpPriceIdx], "number")) || undefined : undefined,
       available: available > 0 ? available : undefined,
       imageUrl: imgIdx !== null ? String(parseValue(rowArr[imgIdx])) || undefined : undefined,
+      barcode: barcodeIdx !== null ? String(parseValue(rowArr[barcodeIdx])) || undefined : undefined,
+      tags: tagsIdx !== null ? String(parseValue(rowArr[tagsIdx])) || undefined : undefined,
+      weight: weightIdx !== null ? Number(parseValue(rowArr[weightIdx], "number")) || undefined : undefined,
       rawData,
     });
   }
