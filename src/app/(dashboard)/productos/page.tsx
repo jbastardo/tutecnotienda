@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { calculatePricing, formatBs, formatUsd } from "@/lib/pricing";
 
 interface Supplier {
   id: string;
@@ -47,11 +48,16 @@ export default function SubirListaPage() {
   const [message, setMessage] = useState("");
   const [margin, setMargin] = useState("40");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [rates, setRates] = useState({ bcv: 0, promedio: 0, lastUpdated: "" });
 
   useEffect(() => {
     fetch("/api/proveedores")
       .then((r) => r.json())
       .then(setSuppliers);
+    fetch("/api/tasas")
+      .then((r) => r.json())
+      .then((d) => { if (d.bcv > 0) setRates(d); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -129,6 +135,22 @@ export default function SubirListaPage() {
       <p className="mt-1 text-sm text-gray-500">
         Importa desde Excel o Sellibri, gestiona y sincroniza
       </p>
+
+      {rates.bcv > 0 && (
+        <div className="mt-4 flex items-center gap-6 rounded-lg bg-blue-50 px-4 py-2.5 text-sm">
+          <div>
+            <span className="text-blue-800 font-semibold">Tasa BCV:</span>
+            <span className="ml-2 text-blue-700">Bs {rates.bcv.toFixed(2)}</span>
+          </div>
+          <div>
+            <span className="text-blue-800 font-semibold">Paralelo:</span>
+            <span className="ml-2 text-blue-700">Bs {rates.promedio.toFixed(2)}</span>
+          </div>
+          <div className="ml-auto text-xs text-blue-500">
+            Ej: costo $100 → margen {margin}% → venta ${((100 / (1 - Number(margin)/100))).toFixed(2)} USD → {(100 / (1 - Number(margin)/100) * rates.promedio).toLocaleString('es-VE', {maximumFractionDigits:0})} Bs
+          </div>
+        </div>
+      )}
 
       {!priceList ? (
         <div className="mt-6 space-y-4">
