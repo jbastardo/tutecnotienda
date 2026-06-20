@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { cn } from "@/lib/utils";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Tutecnotienda - Gestion de Productos",
-  description: "Sistema de gestion de listas de precios y publicacion en Sellibri",
+  title: "Tutecnotienda",
+  description: "Gestion de productos y publicacion en tiendas online",
 };
 
 export default function RootLayout({
@@ -13,12 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body
-        className={cn(
-          "min-h-screen bg-background font-sans antialiased"
-        )}
-      >
+    <html lang="es" className="dark">
+      <body className={`${inter.className} min-h-screen antialiased`}>
         {children}
       </body>
     </html>
