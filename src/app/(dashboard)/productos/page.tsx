@@ -682,11 +682,31 @@ export default function SubirListaPage() {
                     ) : (
                       <span className="text-xs text-gray-300">Sin publicar</span>
                     )}
-                    {p.synced ? (
-                      <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Publicado</span>
-                    ) : (
-                      <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pendiente</span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const res = await fetch("/api/ia/auto-complete", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ productId: p.id }),
+                            credentials: "include",
+                          });
+                          const d = await res.json();
+                          alert(`IA: ${d.description}, Imagenes: ${d.images}`);
+                          fetchCatalog();
+                        }}
+                        className="text-xs text-violet-500 hover:text-violet-700 px-1.5 py-0.5 rounded hover:bg-violet-50"
+                        title="Auto-completar con IA"
+                      >
+                        ✨
+                      </button>
+                      {p.synced ? (
+                        <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Publicado</span>
+                      ) : (
+                        <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pendiente</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
