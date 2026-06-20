@@ -64,33 +64,27 @@ function parseValue(
 ): string | number {
   if (value === undefined || value === null) return "";
   
-  // If it's already a number, return as number for numeric transforms, otherwise string
+  // If it's already a number
   if (typeof value === "number") {
-    return transform === "number" || transform === "currency" || !transform ? value : String(value);
+    return transform === "number" || transform === "currency" ? value : String(value);
   }
   
   if (typeof value === "string") {
-    if (transform === "number" || transform === "currency" || !transform) {
-      // Try to parse as number even without explicit transform
+    // Only try to parse as number if transform is number/currency
+    if (transform === "number" || transform === "currency") {
       const cleaned = value.replace(/[^0-9.,-]/g, "").replace(",", ".");
       const num = parseFloat(cleaned);
-      // Return number if it parsed cleanly and no transform was set (auto-detect)
-      // or if transform explicitly requests number
-      if (!isNaN(num) && (transform || cleaned === value.replace(",", "."))) {
-        return num;
-      }
-      return isNaN(num) ? (transform ? 0 : value.trim()) : num;
+      return isNaN(num) ? 0 : num;
     }
     return value.trim();
   }
   
   if (typeof value === "object" && "w" in value) {
     const str = String(value.w ?? value.v ?? "");
-    if (transform === "number" || transform === "currency" || !transform) {
+    if (transform === "number" || transform === "currency") {
       const cleaned = str.replace(/[^0-9.,-]/g, "").replace(",", ".");
       const num = parseFloat(cleaned);
-      if (!isNaN(num)) return num;
-      return transform ? 0 : str.trim();
+      return isNaN(num) ? 0 : num;
     }
     return str.trim();
   }
@@ -184,10 +178,10 @@ export function parseExcel(
 
     products.push({
       name: String(name),
-      sku: skuIdx !== null ? String(parseValue(rowArr[skuIdx], skuMapping?.transform)) : undefined,
-      description: descIdx !== null ? String(parseValue(rowArr[descIdx], descMapping?.transform)) : undefined,
-      brand: brandIdx !== null ? String(parseValue(rowArr[brandIdx], brandMapping?.transform)) : undefined,
-      category: catIdx !== null ? String(parseValue(rowArr[catIdx], catMapping?.transform)) : undefined,
+      sku: skuIdx !== null ? String(parseValue(rowArr[skuIdx])) : undefined,
+      description: descIdx !== null ? String(parseValue(rowArr[descIdx])) : undefined,
+      brand: brandIdx !== null ? String(parseValue(rowArr[brandIdx])) : undefined,
+      category: catIdx !== null ? String(parseValue(rowArr[catIdx])) : undefined,
       cost: typeof cost === "number" ? cost : 0,
       sellPrice: priceIdx !== null ? Number(parseValue(rowArr[priceIdx], "number")) || undefined : undefined,
       comparePrice: cmpPriceIdx !== null ? Number(parseValue(rowArr[cmpPriceIdx], "number")) || undefined : undefined,
