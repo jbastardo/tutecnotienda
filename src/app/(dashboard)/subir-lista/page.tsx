@@ -169,6 +169,19 @@ export default function SubirListaPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Margen de ganancia (%)
+              </label>
+              <input
+                type="number"
+                value={margin}
+                onChange={(e) => setMargin(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900"
+                min="1" max="500" step="0.5"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Archivo Excel
               </label>
               <div className="flex items-center gap-3">
@@ -244,37 +257,34 @@ export default function SubirListaPage() {
           </div>
 
           <div className="rounded-xl border bg-white">
+            <div className="flex items-center gap-3 p-3 border-b bg-gray-50">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={selectedIds.size === priceList.products.length} onChange={() => selectedIds.size === priceList.products.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(priceList.products.map(p => p.id)))} className="w-4 h-4" />
+                <span className="text-xs font-medium text-gray-600">Todos</span>
+              </label>
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600">
+                <option value="">Todas las lineas</option>
+                {[...new Set(priceList.products.map(p => p.category).filter(Boolean))].map(cat => <option key={cat} value={cat || ""}>{cat}</option>)}
+              </select>
+              <span className="ml-auto text-xs text-gray-400">{selectedIds.size} de {priceList.totalRows}</span>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50 text-left">
-                    <th className="w-12 px-4 py-3 text-center">
-                      <span className="text-xs font-medium text-gray-500">
-                        Sel.
-                      </span>
-                    </th>
-                    <th className="px-4 py-3 font-medium text-gray-600">
-                      Producto
-                    </th>
-                    <th className="px-4 py-3 font-medium text-gray-600">
-                      SKU
-                    </th>
-                    <th className="px-4 py-3 font-medium text-gray-600 text-right">
-                      Costo
-                    </th>
-                    <th className="px-4 py-3 font-medium text-gray-600 text-right">
-                      Venta (+40%)
-                    </th>
-                    <th className="px-4 py-3 font-medium text-gray-600 text-right">
-                      Utilidad
-                    </th>
-                    <th className="px-4 py-3 font-medium text-gray-600 text-center">
-                      Estado
-                    </th>
+                    <th className="w-10 px-3 py-2 text-center"><span className="text-xs font-medium text-gray-500">Sel.</span></th>
+                    <th className="px-3 py-2 font-medium text-gray-600">Producto</th>
+                    <th className="px-3 py-2 font-medium text-gray-600">SKU</th>
+                    <th className="px-3 py-2 font-medium text-gray-600">Linea</th>
+                    <th className="px-3 py-2 font-medium text-gray-600 text-right">Costo</th>
+                    <th className="px-3 py-2 font-medium text-gray-600 text-right">Venta</th>
+                    <th className="px-3 py-2 font-medium text-gray-600 text-right">Utilidad</th>
+                    <th className="px-3 py-2 font-medium text-gray-600 text-right">Stock</th>
+                    <th className="px-3 py-2 font-medium text-gray-600 text-center">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {priceList.products.map((p) => {
+                  {priceList.products.filter(p => !categoryFilter || p.category === categoryFilter).map((p) => {
                     const isSelected = selectedIds.has(p.id);
                     return (
                       <tr
@@ -298,16 +308,19 @@ export default function SubirListaPage() {
                         <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
                           {p.name}
                         </td>
-                        <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                        <td className="px-3 py-2 font-mono text-xs text-gray-500 whitespace-nowrap">
                           {p.sku || "-"}
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-900">
+                        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                          {p.category || "-"}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-900 whitespace-nowrap">
                           {formatCurrency(Number(p.cost))}
                         </td>
-                        <td className="px-4 py-3 text-right font-medium text-green-600">
+                        <td className="px-3 py-2 text-right font-medium text-green-600 whitespace-nowrap">
                           {formatCurrency(Number(p.sellPrice))}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold">
+                        <td className="px-3 py-2 text-right font-semibold whitespace-nowrap">
                           <span
                             className={
                               Number(p.profit) > 100
@@ -318,7 +331,10 @@ export default function SubirListaPage() {
                             {formatCurrency(Number(p.profit))}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-2 text-right text-gray-700">
+                          {p.available > 0 ? p.available : "-"}
+                        </td>
+                        <td className="px-3 py-2 text-center">
                           {p.selected ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
                               <Check className="h-3 w-3" />
