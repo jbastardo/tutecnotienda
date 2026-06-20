@@ -165,8 +165,8 @@ export function parseExcel(
       continue;
     }
 
-    const name = parseValue(rowArr[nameIdx], nameMapping?.transform);
-    const cost = parseValue(rowArr[costIdx], costMapping?.transform);
+    const name = parseValue(rowArr[nameIdx]);
+    const cost = parseValue(rowArr[costIdx], "number");
     const available = availIdx !== null ? parseInt(String(parseValue(rowArr[availIdx], "number"))) || 0 : 0;
 
     if (!name || (typeof cost === "number" && cost <= 0)) continue;
