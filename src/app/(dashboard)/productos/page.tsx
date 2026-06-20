@@ -386,6 +386,19 @@ export default function SubirListaPage() {
                     {(priceList as any)._errors.join(" · ")}
                   </p>
                 )}
+                <p className="text-xs text-gray-400 mt-1">
+                  <button
+                    onClick={async () => {
+                      const skus = priceList.products.filter(p => p.sku).map(p => p.sku);
+                      const res = await fetch("/api/productos?notInList=" + skus.join(","));
+                      const data = await res.json();
+                      setMessage(`${data.length} productos en la web NO estan en esta lista.`);
+                    }}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Ver productos faltantes en esta lista
+                  </button>
+                </p>
               </div>
               <button
                 onClick={() => setPriceList(null)}

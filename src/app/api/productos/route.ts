@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const synced = searchParams.get("synced");
   const supplierId = searchParams.get("supplierId");
   const sku = searchParams.get("sku");
+  const notInList = searchParams.get("notInList");
 
   const where: Record<string, unknown> = {};
 
@@ -15,6 +16,11 @@ export async function GET(request: Request) {
   if (synced === "false") where.synced = false;
   if (supplierId) where.supplierId = supplierId;
   if (sku) where.sku = sku;
+  if (notInList) {
+    const skus = notInList.split(",").filter(Boolean);
+    where.NOT = { sku: { in: skus } };
+    where.synced = true;
+  }
 
   const products = await prisma.product.findMany({
     where,
