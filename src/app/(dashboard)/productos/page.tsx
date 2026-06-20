@@ -396,7 +396,29 @@ export default function SubirListaPage() {
                     }}
                     className="text-blue-500 hover:underline"
                   >
-                    Ver productos faltantes en esta lista
+                    Ver faltantes
+                  </button>
+                  {" · "}
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Poner stock 0 en la web a todos los productos que NO estan en esta lista?")) return;
+                      setCreating(true);
+                      setMessage("Poniendo stock 0 a faltantes...");
+                      const skus = priceList.products.filter(p => p.sku).map(p => p.sku);
+                      const res = await fetch("/api/sellibri/bulk-stock-zero", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ excludeSkus: skus }),
+                        credentials: "include",
+                      });
+                      const data = await res.json();
+                      setMessage(`Stock en 0 para ${data.updated || 0} productos.`);
+                      setCreating(false);
+                    }}
+                    className="text-red-500 hover:underline"
+                    disabled={creating}
+                  >
+                    Ocultar faltantes (stock 0)
                   </button>
                 </p>
               </div>
