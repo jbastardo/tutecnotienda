@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download, LayoutGrid, List } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { calculatePricing, formatBs, formatUsd } from "@/lib/pricing";
 
@@ -49,6 +49,7 @@ export default function SubirListaPage() {
   const [margin, setMargin] = useState("40");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [rates, setRates] = useState({ bcv: 0, promedio: 0, lastUpdated: "" });
+  const [viewMode, setViewMode] = useState<"table" | "grid">("grid");
 
   useEffect(() => {
     fetch("/api/proveedores")
@@ -441,8 +442,44 @@ export default function SubirListaPage() {
                 <option value="">Todas las lineas</option>
                 {[...new Set(priceList.products.map(p => p.category).filter(Boolean))].map(cat => <option key={cat} value={cat || ""}>{cat}</option>)}
               </select>
-              <span className="ml-auto text-xs text-gray-400">{selectedIds.size} de {priceList.totalRows}</span>
+              <div className="ml-auto flex items-center gap-1">
+                <button onClick={() => setViewMode("table")} className={`p-1 rounded ${viewMode==="table"?"bg-blue-100 text-blue-600":"text-gray-400"}`} title="Lista"><List className="h-4 w-4"/></button>
+                <button onClick={() => setViewMode("grid")} className={`p-1 rounded ${viewMode==="grid"?"bg-blue-100 text-blue-600":"text-gray-400"}`} title="Cuadricula"><LayoutGrid className="h-4 w-4"/></button>
+              </div>
+              <span className="text-xs text-gray-400">{selectedIds.size} de {priceList.totalRows}</span>
             </div>
+
+            <div className={viewMode === "grid" ? "" : "hidden"}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
+                {priceList.products.filter(p => !categoryFilter || p.category === categoryFilter).map((p) => {
+                  const isSelected = selectedIds.has(p.id);
+                  return (
+                    <div key={p.id} onClick={() => toggleProduct(p.id)}
+                      className={`cursor-pointer rounded-lg border-2 p-3 ${isSelected ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                      <div className="flex items-start justify-between mb-1">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${p.selected ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {p.selected ? "> $100" : "-"}
+                        </span>
+                        {p.available > 0 && <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{p.available}</span>}
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">{p.name}</p>
+                      {p.sku && <p className="text-xs text-gray-400 font-mono mb-1">{p.sku}</p>}
+                      {p.category && <p className="text-xs text-gray-400 mb-1">{p.category}</p>}
+                      <div className="flex justify-between items-end">
+                        <div><p className="text-xs text-gray-400">Costo</p><p className="text-sm font-semibold text-gray-800">{formatCurrency(Number(p.cost))}</p></div>
+                        <div className="text-right"><p className="text-xs text-gray-400">Venta</p><p className="text-sm font-bold text-green-600">{formatCurrency(Number(p.sellPrice))}</p></div>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between text-xs">
+                        <span className="text-gray-500">Utilidad</span>
+                        <span className={`font-semibold ${Number(p.profit) > 100 ? "text-blue-600" : "text-gray-400"}`}>{formatCurrency(Number(p.profit))}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={viewMode === "table" ? "" : "hidden"}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -528,6 +565,7 @@ export default function SubirListaPage() {
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
 
           <div className="flex items-center justify-between rounded-xl border bg-white p-4">
