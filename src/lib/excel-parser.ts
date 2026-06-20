@@ -100,7 +100,7 @@ function parseValue(
 export function parseExcel(
   buffer: ArrayBuffer,
   mappings: SupplierMapping[]
-): { products: ParsedProduct[]; errors: string[] } {
+): { products: ParsedProduct[]; errors: string[]; headers: string[] } {
   const errors: string[] = [];
   const workbook = XLSX.read(buffer, { type: "array" });
 
@@ -109,7 +109,7 @@ export function parseExcel(
   const sheet = workbook.Sheets[sheetName];
 
   if (!sheet) {
-    return { products: [], errors: [`Sheet "${sheetName}" not found`] };
+    return { products: [], errors: [`Sheet "${sheetName}" not found`], headers: [] };
   }
 
   const jsonData = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
@@ -118,11 +118,11 @@ export function parseExcel(
   });
 
   if (jsonData.length === 0) {
-    return { products: [], errors: ["El archivo Excel esta vacio"] };
+    return { products: [], errors: ["El archivo Excel esta vacio"], headers: [] };
   }
 
   const skipRows = mappings[0]?.skipRows || 0;
-  const headers = jsonData[skipRows] as string[];
+  const headers = (jsonData[skipRows] as string[]) || [];
   const dataRows = jsonData.slice(skipRows + 1);
 
   const nameMapping = mappings.find((m) => m.key === "name");
@@ -157,7 +157,7 @@ export function parseExcel(
   if (costIdx === null) errors.push(`Columna 'cost' no encontrada. Headers: ${headers.slice(0, 20).join(", ")}`);
 
   if (nameIdx === null || costIdx === null) {
-    return { products: [], errors };
+    return { products: [], errors, headers: headers.map(h => String(h)) };
   }
 
   const products: ParsedProduct[] = [];
@@ -200,5 +200,5 @@ export function parseExcel(
     });
   }
 
-  return { products, errors };
+  return { products, errors, headers: headers.map(h => String(h)) };
 }

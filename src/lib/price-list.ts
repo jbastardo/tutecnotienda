@@ -24,7 +24,7 @@ export async function processUploadedFile(
     );
   }
 
-  const { products, errors } = parseExcel(buffer, supplier.mappings);
+  const { products, errors, headers } = parseExcel(buffer, supplier.mappings);
 
   if (errors.some((e) => e.includes("no encontrada"))) {
     throw new Error(errors.join("; "));
@@ -77,5 +77,6 @@ export async function processUploadedFile(
     totalRows: processedProducts.length,
     selectedCount,
     errors,
+    headers,
   };
 }

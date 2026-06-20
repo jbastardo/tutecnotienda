@@ -38,11 +38,12 @@ export async function POST(request: Request) {
       include: {
         products: {
           orderBy: { profit: "desc" },
+          take: 200,
         },
       },
     });
 
-    return NextResponse.json(priceList, { status: 201 });
+    return NextResponse.json({ ...priceList, _headers: result.headers, _errors: result.errors }, { status: 201 });
   } catch (error: any) {
     console.error("[SubirLista] Error:", error);
     return NextResponse.json(

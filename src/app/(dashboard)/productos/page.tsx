@@ -283,6 +283,16 @@ export default function SubirListaPage() {
                     {priceList.selectedCount} con utilidad &gt; $100
                   </span>
                 </p>
+                {(priceList as any)._headers && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Headers: {(priceList as any)._headers.join(" | ")}
+                  </p>
+                )}
+                {(priceList as any)._errors?.length > 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {(priceList as any)._errors.join(" · ")}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setPriceList(null)}
