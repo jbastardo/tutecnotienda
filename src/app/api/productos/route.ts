@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
   const synced = searchParams.get("synced");
   const supplierId = searchParams.get("supplierId");
+  const sku = searchParams.get("sku");
 
   const where: Record<string, unknown> = {};
 
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
   if (synced === "true") where.synced = true;
   if (synced === "false") where.synced = false;
   if (supplierId) where.supplierId = supplierId;
+  if (sku) where.sku = sku;
 
   const products = await prisma.product.findMany({
     where,
@@ -92,15 +94,21 @@ export async function DELETE(request: Request) {
 
 export async function PUT(request: Request) {
   const body = await request.json();
-  const { id, supplierId } = body;
+  const { id, supplierId, cost, sellPrice, profit } = body;
 
   if (!id) {
     return NextResponse.json({ error: "ID requerido" }, { status: 400 });
   }
 
+  const data: Record<string, unknown> = {};
+  if (supplierId !== undefined) data.supplierId = supplierId || null;
+  if (cost !== undefined) data.cost = cost;
+  if (sellPrice !== undefined) data.sellPrice = sellPrice;
+  if (profit !== undefined) data.profit = profit;
+
   const product = await prisma.product.update({
     where: { id },
-    data: { supplierId: supplierId || null },
+    data,
   });
 
   return NextResponse.json(product);

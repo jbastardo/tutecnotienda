@@ -108,22 +108,93 @@ export default function SubirListaPage() {
     setCreating(true);
     setMessage("");
 
+    const ids = Array.from(selectedIds);
+
+    // Create in local DB
     const res = await fetch("/api/productos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      body: JSON.stringify({ ids }),
     });
 
     const data = await res.json();
 
-    if (res.ok) {
-      setMessage(`${data.length} productos creados exitosamente`);
-      setPriceList(null);
-      setFile(null);
-    } else {
+    if (!res.ok) {
       setMessage(data.error || "Error al crear productos");
+      setCreating(false);
+      return;
     }
 
+    // Sync to Sellibri
+    let synced = 0;
+    for (const product of data) {
+      const plp = priceList?.products.find(p => p.id === product.sourceId || p.name === product.name);
+      try {
+        const syncRes = await fetch("/api/sellibri/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productId: product.id,
+            available: plp?.available || 0,
+          }),
+          credentials: "include",
+        });
+        if (syncRes.ok) synced++;
+      } catch {}
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    setMessage(`${data.length} creados. ${synced} sincronizados a la web.`);
+    setPriceList(null);
+    setFile(null);
+    setCreating(false);
+  };
+
+  const handleUpdateStock = async () => {
+    if (selectedIds.size === 0) return;
+    setCreating(true);
+    setMessage("Actualizando precios y stock...");
+    let updated = 0;
+
+    for (const id of Array.from(selectedIds)) {
+      const plp = priceList?.products.find(p => p.id === id);
+      if (!plp?.sku) continue;
+
+      const checkRes = await fetch(`/api/productos?sku=${encodeURIComponent(plp.sku)}`);
+      const existing = await checkRes.json();
+      
+      if (Array.isArray(existing) && existing.length > 0) {
+        // Update local product with new cost/price
+        await fetch("/api/productos", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: existing[0].id,
+            cost: Number(plp.cost),
+            sellPrice: Number(plp.sellPrice),
+            profit: Number(plp.profit),
+          }),
+        });
+
+        // Sync to Sellibri if already synced
+        if (existing[0].synced) {
+          try {
+            const syncRes = await fetch("/api/sellibri/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                productId: existing[0].id,
+                available: plp.available || 0,
+              }),
+              credentials: "include",
+            });
+            if (syncRes.ok) updated++;
+          } catch {}
+        }
+      }
+      await new Promise(r => setTimeout(r, 350));
+    }
+    setMessage(`Precios y stock actualizados en ${updated} productos.`);
     setCreating(false);
   };
 
@@ -450,6 +521,14 @@ export default function SubirListaPage() {
                 Solo automaticos
               </button>
               <button
+                onClick={handleUpdateStock}
+                disabled={selectedIds.size === 0 || creating}
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                <ArrowRight className="h-4 w-4" />
+                Actualizar precios y stock
+              </button>
+              <button
                 onClick={handleCreateProducts}
                 disabled={selectedIds.size === 0 || creating}
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
@@ -460,8 +539,8 @@ export default function SubirListaPage() {
                   <ArrowRight className="h-4 w-4" />
                 )}
                 {creating
-                  ? "Creando..."
-                  : `Crear ${selectedIds.size} producto(s)`}
+                  ? "Procesando..."
+                  : `Crear y publicar (${selectedIds.size})`}
               </button>
             </div>
           </div>

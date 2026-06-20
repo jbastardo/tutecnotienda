@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProductVariant, searchProductImages, isConfigured, getStoreDomain } from "@/lib/sellibri";
+import { createProduct, updateProductVariant, searchProductBySku, searchProductImages, isConfigured, getStoreDomain } from "@/lib/sellibri";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { productId } = body;
+  const { productId, available } = body;
 
   if (!productId) {
     return NextResponse.json({ error: "productId requerido" }, { status: 400 });
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
   if (!isConfigured()) {
     return NextResponse.json(
-      { error: "Sellibri no esta configurado. Revisa SELLIBRI_API_KEY y SELLIBRI_STORE_DOMAIN" },
+      { error: "Sellibri no configurado" },
       { status: 400 }
     );
   }
@@ -28,13 +28,56 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
   }
 
-  if (product.synced) {
-    return NextResponse.json(
-      { error: "El producto ya esta sincronizado con Sellibri" },
-      { status: 400 }
-    );
+  const stockToUpdate = available ?? 0;
+
+  // If already synced, just update stock
+  if (product.synced && product.sellibriId) {
+    // Get variant ID from sellibri
+    const variantId = product.images?.[0] as unknown as number; // Not ideal, need better variant tracking
+
+    // Search for variant by SKU
+    if (product.sku) {
+      const existingVariant = await searchProductBySku(product.sku);
+      if (existingVariant) {
+        await updateProductVariant(existingVariant.id, { available: stockToUpdate });
+        return NextResponse.json({ success: true, action: "updated_stock", variantId: existingVariant.id });
+      }
+    }
+
+    return NextResponse.json({ success: true, action: "no_variant_found" });
   }
 
+  // Check if SKU already exists in Sellibri
+  if (product.sku) {
+    const existingVariant = await searchProductBySku(product.sku);
+    if (existingVariant) {
+      // Update existing product's variant with new price and stock
+      await updateProductVariant(existingVariant.id, {
+        price: Number(product.sellPrice),
+        cost: Number(product.cost),
+        available: stockToUpdate,
+      });
+
+      await prisma.product.update({
+        where: { id: product.id },
+        data: {
+          sellibriId: String(existingVariant.product_id),
+          sellibriUrl: `https://${storeDomain}/p/${existingVariant.product_id}`,
+          synced: true,
+          status: "published",
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        action: "updated_existing",
+        sellibriId: existingVariant.product_id,
+        variantId: existingVariant.id,
+      });
+    }
+  }
+
+  // Create new product in Sellibri
   const images = await searchProductImages(product.name);
 
   const result = await createProduct({
@@ -58,13 +101,16 @@ export async function POST(request: Request) {
 
   const variantId = result.variants?.[0]?.id;
 
+  // Update stock if variant was created
+  if (variantId && stockToUpdate > 0) {
+    await updateProductVariant(variantId, { available: stockToUpdate });
+  }
+
   await prisma.product.update({
     where: { id: product.id },
     data: {
       sellibriId: String(result.id),
-      sellibriUrl: variantId
-        ? `https://${storeDomain}/p/${result.slug}`
-        : null,
+      sellibriUrl: `https://${storeDomain}/p/${result.slug}`,
       synced: true,
       status: "published",
     },
@@ -72,6 +118,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
+    action: "created",
     sellibriId: result.id,
     variantId,
   });
