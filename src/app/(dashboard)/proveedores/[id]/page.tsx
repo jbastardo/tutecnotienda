@@ -101,7 +101,7 @@ export default function EditarProveedorPage() {
         skipRows,
         sheetName,
         mappings: supplier.mappings
-          .filter((m) => m.columnName)
+          .filter((m) => m.columnName || (m.columnIndex !== null && m.columnIndex !== undefined))
           .map((m) => ({
             key: m.key,
             columnName: m.columnName,
