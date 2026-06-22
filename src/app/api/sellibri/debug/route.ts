@@ -7,7 +7,7 @@ export async function GET() {
 
   const count = await prisma.product.count();
   const sample = await prisma.product.findMany({
-    select: { name: true, sellibriUrl: true, cost: true, sellPrice: true },
+    select: { name: true, sellibriUrl: true, cost: true, sellPrice: true, images: true },
     take: 3,
   });
 
