@@ -670,16 +670,28 @@ export default function SubirListaPage() {
                   <Upload className="h-4 w-4" /> Subir Excel
                 </button>
                 <button onClick={async () => {
-                  if (!confirm("Importar productos de tutecnotienda.com?")) return;
-                  setError("");
+                  if (!confirm("Importar productos de Sellibri?")) return;
                   try {
                     const res = await fetch("/api/sellibri/import", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
                     const data = await res.json();
-                    if (res.ok) { alert(`Importados: ${data.imported} nuevos, ${data.skipped} existian`); fetchCatalog(); }
+                    if (res.ok) alert(`Importados: ${data.imported} nuevos, ${data.updated} actualizados, ${data.skipped} existian`);
                     else alert(data.error || "Error");
+                    fetchCatalog();
                   } catch { alert("Error de conexion"); }
                 }} className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-                  <Download className="h-4 w-4" /> Importar de Sellibri
+                  <Download className="h-4 w-4" /> De Sellibri
+                </button>
+                <button onClick={async () => {
+                  if (!confirm("Importar productos de Tecnotizacion?")) return;
+                  try {
+                    const res = await fetch("/api/tecnotizacion/import", { method: "POST", credentials: "include" });
+                    const data = await res.json();
+                    if (res.ok) alert(`Importados: ${data.imported} locales, ${data.synced} a la web`);
+                    else alert(data.error || "Error");
+                    fetchCatalog();
+                  } catch { alert("Error de conexion"); }
+                }} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                  De Tecnotizacion
                 </button>
               </div>
             </div>
