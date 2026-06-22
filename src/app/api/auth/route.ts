@@ -16,9 +16,9 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ success: true });
   response.cookies.set("tutecnotienda_session", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: "lax",
-    maxAge: 86400, // 24 horas
+    maxAge: 86400,
     path: "/",
   });
 
