@@ -686,6 +686,23 @@ export default function SubirListaPage() {
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
+                          const res = await fetch("/api/tecnotizacion/sync", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ productIds: [p.id] }),
+                            credentials: "include",
+                          });
+                          const d = await res.json();
+                          alert(d.sent > 0 ? "Enviado a Tecnotizacion" : "Error: " + (d.error || "desconocido"));
+                        }}
+                        className="text-xs text-indigo-500 hover:text-indigo-700 px-1.5 py-0.5 rounded hover:bg-indigo-50"
+                        title="Enviar a Tecnotizacion"
+                      >
+                        📱
+                      </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
                           const res = await fetch("/api/ia/auto-complete", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
