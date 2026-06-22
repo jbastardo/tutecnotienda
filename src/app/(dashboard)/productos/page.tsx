@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download, LayoutGrid, List, Package } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download, LayoutGrid, List, Package, Search, ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { calculatePricing, formatBs, formatUsd } from "@/lib/pricing";
 
@@ -53,6 +53,9 @@ export default function SubirListaPage() {
   const [showCatalog, setShowCatalog] = useState(true);
   const [catalogProducts, setCatalogProducts] = useState<any[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
 
   useEffect(() => {
     fetch("/api/proveedores")
@@ -636,15 +639,51 @@ export default function SubirListaPage() {
       )}
 
       {!priceList && (
-        <div className="mt-8">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Catalogo ({catalogProducts.length} productos en la web)
-            </h2>
-            <button onClick={fetchCatalog} className="text-sm text-blue-600 hover:underline">
-              {catalogLoading ? "Cargando..." : "Refrescar"}
-            </button>
+        <div className="mt-6">
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <h2 className="text-lg font-semibold text-gray-900 mr-2">Catalogo ({catalogProducts.length})</h2>
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-2.5 top-2 h-4 w-4 text-gray-400" />
+              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar nombre, SKU, marca..." className="w-full rounded-lg border border-gray-300 pl-8 pr-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none" />
+            </div>
+            <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}
+              className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-600">
+              <option value="">Todas las marcas</option>
+              {[...new Set(catalogProducts.map(p => p.supplier?.name).filter(Boolean))].map(b => <option key={b as string} value={b as string}>{b}</option>)}
+            </select>
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={() => setShowUpload(!showUpload)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <Upload className="h-4 w-4" /> Importar {showUpload ? <ChevronUp className="h-3 w-3"/> : <ChevronDown className="h-3 w-3"/>}
+              </button>
+              <button onClick={fetchCatalog} className="text-sm text-blue-600 hover:underline">{catalogLoading ? "..." : "Refrescar"}</button>
+              <button onClick={() => setViewMode("table")} className={`p-1.5 rounded ${viewMode==="table"?"bg-blue-100 text-blue-600":"text-gray-400"}`}><List className="h-4 w-4"/></button>
+              <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded ${viewMode==="grid"?"bg-blue-100 text-blue-600":"text-gray-400"}`}><LayoutGrid className="h-4 w-4"/></button>
+            </div>
           </div>
+
+          {showUpload && (
+            <div className="mb-4 rounded-xl border bg-white p-4 text-sm text-gray-500">
+              <p className="mb-3">Importar productos desde Excel o directamente de la web.</p>
+              <div className="flex gap-2">
+                <button onClick={() => { setShowUpload(false); setFile(null); setError(""); }} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                  <Upload className="h-4 w-4" /> Subir Excel
+                </button>
+                <button onClick={async () => {
+                  if (!confirm("Importar productos de tutecnotienda.com?")) return;
+                  setError("");
+                  try {
+                    const res = await fetch("/api/sellibri/import", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
+                    const data = await res.json();
+                    if (res.ok) { alert(`Importados: ${data.imported} nuevos, ${data.skipped} existian`); fetchCatalog(); }
+                    else alert(data.error || "Error");
+                  } catch { alert("Error de conexion"); }
+                }} className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+                  <Download className="h-4 w-4" /> Importar de Sellibri
+                </button>
+              </div>
+            </div>
+          )}
 
           {catalogLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-gray-300"/></div>
@@ -654,7 +693,14 @@ export default function SubirListaPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {catalogProducts.map((p: any) => (
+              {catalogProducts.filter((p: any) => {
+                if (searchQuery) {
+                  const q = searchQuery.toLowerCase();
+                  if (!(p.name||"").toLowerCase().includes(q) && !(p.sku||"").toLowerCase().includes(q) && !(p.supplier?.name||"").toLowerCase().includes(q)) return false;
+                }
+                if (brandFilter && p.supplier?.name !== brandFilter) return false;
+                return true;
+              }).map((p: any) => (
                 <div key={p.id} className="rounded-lg border border-gray-200 bg-white p-3 hover:shadow-md transition-shadow">
                   {p.images?.[0] ? (
                     <img src={p.images[0]} alt={p.name} className="w-full h-32 object-cover rounded-md mb-2" loading="lazy" />
