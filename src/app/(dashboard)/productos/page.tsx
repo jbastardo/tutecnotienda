@@ -732,14 +732,16 @@ export default function SubirListaPage() {
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const res = await fetch("/api/tecnotizacion/sync", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ productIds: [p.id] }),
-                            credentials: "include",
-                          });
-                          const d = await res.json();
-                          alert(d.sent > 0 ? "Enviado a Tecnotizacion" : "Error");
+                          try {
+                            const res = await fetch("/api/tecnotizacion/sync", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ productIds: [p.id] }),
+                              credentials: "include",
+                            });
+                            const d = await res.json();
+                            alert(d.sent > 0 ? "Enviado a Tecnotizacion" : "Error: " + (d.error || res.status));
+                          } catch(err) { alert("Error de red: " + err); }
                         }}
                         className="text-xs text-indigo-500 hover:text-indigo-700 px-1 py-0.5 rounded hover:bg-indigo-50"
                         title="Enviar a Tecnotizacion"
@@ -749,14 +751,16 @@ export default function SubirListaPage() {
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const res = await fetch("/api/cachicamo/sync", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ productId: p.id }),
-                            credentials: "include",
-                          });
-                          const d = await res.json();
-                          alert(d.ok ? "Enviado a Cachicamo" : "Error: " + (d.error || ""));
+                          try {
+                            const res = await fetch("/api/cachicamo/sync", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ productId: p.id }),
+                              credentials: "include",
+                            });
+                            const d = await res.json();
+                            alert(d.ok ? "Enviado a Cachicamo" : "Error: " + (d.error || res.status));
+                          } catch(err) { alert("Error de red: " + err); }
                         }}
                         className="text-xs text-amber-500 hover:text-amber-700 px-1 py-0.5 rounded hover:bg-amber-50"
                         title="Enviar a Cachicamo"
@@ -766,15 +770,17 @@ export default function SubirListaPage() {
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const res = await fetch("/api/ia/auto-complete", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ productId: p.id }),
-                            credentials: "include",
-                          });
-                          const d = await res.json();
-                          alert(`IA: ${d.description}, Imagenes: ${d.images}`);
-                          fetchCatalog();
+                          try {
+                            const res = await fetch("/api/ia/auto-complete", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ productId: p.id }),
+                              credentials: "include",
+                            });
+                            const d = await res.json();
+                            alert(`Descripcion: ${d.description || "fallo"}\nImagenes: ${d.images || "ninguna"}`);
+                            fetchCatalog();
+                          } catch(err) { alert("Error: " + err); }
                         }}
                         className="text-xs text-violet-500 hover:text-violet-700 px-1.5 py-0.5 rounded hover:bg-violet-50"
                         title="Auto-completar con IA"

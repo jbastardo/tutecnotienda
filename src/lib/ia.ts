@@ -53,12 +53,15 @@ export async function searchProductImages(query: string): Promise<string[]> {
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
   if (!unsplashKey) return [];
 
+  // Clean query - take first 3-4 meaningful words
+  const words = query.replace(/[^\w\s]/g, "").split(/\s+/).filter(w => w.length > 2).slice(0, 4);
+  const searchTerm = words.join(" ") || query.substring(0, 30);
+
   try {
     const res = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-        query
-      )}&per_page=4&client_id=${unsplashKey}`
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchTerm)}&per_page=4&client_id=${unsplashKey}`
     );
+    if (!res.ok) return [];
     const data = await res.json();
     return (data.results || []).map(
       (r: { urls: { regular: string } }) => r.urls.regular
