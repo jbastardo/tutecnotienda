@@ -2,35 +2,36 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function POST() {
-  // Delete duplicate products (same sellibriId or same SKU, keep the newest)
-  const duplicates = await prisma.$queryRawUnsafe<{ id: string; sku: string; sellibri_id: string }[]>(`
-    SELECT id, sku, sellibri_id as sellibri_id
-    FROM "Product"
-    WHERE synced = true AND sellibri_id IS NOT NULL
-    ORDER BY "createdAt" DESC
-  `);
+  // Get all products with SKU, grouped by SKU
+  const all = await prisma.product.findMany({
+    where: { sku: { not: null } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, sku: true },
+  });
 
-  const seenSkus = new Set<string>();
-  const seenIds = new Set<string>();
+  const seen = new Set<string>();
   const toDelete: string[] = [];
 
-  for (const p of duplicates) {
-    const key = p.sku || p.sellibri_id;
-    if (!key || seenSkus.has(key)) {
+  for (const p of all) {
+    const key = p.sku!;
+    if (seen.has(key)) {
       toDelete.push(p.id);
     } else {
-      seenSkus.add(key);
+      seen.add(key);
     }
   }
 
   if (toDelete.length > 0) {
-    await prisma.product.deleteMany({
-      where: { id: { in: toDelete } },
-    });
+    // Delete in batches of 100
+    for (let i = 0; i < toDelete.length; i += 100) {
+      await prisma.product.deleteMany({
+        where: { id: { in: toDelete.slice(i, i + 100) } },
+      });
+    }
   }
 
-  const count = await prisma.product.count();
+  const total = await prisma.product.count();
   const synced = await prisma.product.count({ where: { synced: true } });
 
-  return NextResponse.json({ deleted: toDelete.length, total: count, synced });
+  return NextResponse.json({ deleted: toDelete.length, total, synced });
 }
