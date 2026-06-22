@@ -32,11 +32,8 @@ export async function POST(request: Request) {
       imageUrl: p.images?.[0] || undefined,
     });
 
-    if (ok) {
-      sent++;
-    } else {
-      errors++;
-    }
+    sent++;
+    if (!ok) errors++;
 
     await new Promise((r) => setTimeout(r, 200));
   }

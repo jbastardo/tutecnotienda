@@ -30,21 +30,20 @@ export async function POST(request: Request) {
 
   const stockToUpdate = available ?? 0;
 
-  // If already synced, just update stock
+  // If already synced, update the existing product
   if (product.synced && product.sellibriId) {
-    // Get variant ID from sellibri
-    const variantId = product.images?.[0] as unknown as number; // Not ideal, need better variant tracking
-
-    // Search for variant by SKU
     if (product.sku) {
       const existingVariant = await searchProductBySku(product.sku);
       if (existingVariant) {
-        await updateProductVariant(existingVariant.id, { available: stockToUpdate });
-        return NextResponse.json({ success: true, action: "updated_stock", variantId: existingVariant.id });
+        await updateProductVariant(existingVariant.id, {
+          price: Number(product.sellPrice),
+          cost: Number(product.cost),
+          available: stockToUpdate,
+        });
+        return NextResponse.json({ success: true, action: "updated_existing", variantId: existingVariant.id });
       }
     }
-
-    return NextResponse.json({ success: true, action: "no_variant_found" });
+    return NextResponse.json({ success: true, action: "already_synced" });
   }
 
   // Check if SKU already exists in Sellibri

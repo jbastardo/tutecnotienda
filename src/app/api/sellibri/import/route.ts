@@ -17,6 +17,7 @@ export async function POST(request: Request) {
 
   let imported = 0;
   let skipped = 0;
+  let updated = 0;
   let errors: string[] = [];
 
   const result = await fetchAllProducts((page, total) => {
@@ -41,13 +42,26 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
+        // Update existing product with latest data and images
+        await prisma.product.update({
+          where: { id: existing.id },
+          data: {
+            name: sp.title,
+            cost: sp.cost,
+            sellPrice: sp.price,
+            profit: sp.price - sp.cost,
+            margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
+            images: sp.images.length > 0 ? sp.images : existing.images,
+            sellibriUrl: `https://${storeDomain}/p/${generateSlug(sp.title)}`,
+          },
+        });
         if (supplierId && !existing.supplierId) {
           await prisma.product.update({
             where: { id: existing.id },
             data: { supplierId },
           });
         }
-        skipped++;
+        updated++;
         continue;
       }
 
@@ -78,6 +92,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     total: allProducts.length,
     imported,
+    updated,
     skipped,
     errors: errors.slice(0, 10),
   });
