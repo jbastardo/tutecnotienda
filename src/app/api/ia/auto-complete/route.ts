@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { generateDescription, searchProductImages } from "@/lib/ia";
 import { isConfigured as isSellibriConfigured } from "@/lib/sellibri";
 
+export async function GET() {
+  const gemini = !!process.env.GEMINI_API_KEY;
+  const unsplash = !!process.env.UNSPLASH_ACCESS_KEY;
+  return NextResponse.json({ gemini, unsplash, configured: gemini && unsplash });
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const { productId, overwrite } = body;
