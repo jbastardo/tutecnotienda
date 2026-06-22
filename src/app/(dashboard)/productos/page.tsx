@@ -693,12 +693,29 @@ export default function SubirListaPage() {
                             credentials: "include",
                           });
                           const d = await res.json();
-                          alert(d.sent > 0 ? "Enviado a Tecnotizacion" : "Error: " + (d.error || "desconocido"));
+                          alert(d.sent > 0 ? "Enviado a Tecnotizacion" : "Error");
                         }}
-                        className="text-xs text-indigo-500 hover:text-indigo-700 px-1.5 py-0.5 rounded hover:bg-indigo-50"
+                        className="text-xs text-indigo-500 hover:text-indigo-700 px-1 py-0.5 rounded hover:bg-indigo-50"
                         title="Enviar a Tecnotizacion"
                       >
                         📱
+                      </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const res = await fetch("/api/cachicamo/sync", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ productId: p.id }),
+                            credentials: "include",
+                          });
+                          const d = await res.json();
+                          alert(d.ok ? "Enviado a Cachicamo" : "Error: " + (d.error || ""));
+                        }}
+                        className="text-xs text-amber-500 hover:text-amber-700 px-1 py-0.5 rounded hover:bg-amber-50"
+                        title="Enviar a Cachicamo"
+                      >
+                        🏷️
                       </button>
                       <button
                         onClick={async (e) => {
