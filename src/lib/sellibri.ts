@@ -216,7 +216,7 @@ export async function updateProductVariant(
   if (updates.available !== undefined) {
     variantData.stock_items_attributes = [
       {
-        stock_location_id: updates.stockLocationId || 1,
+        stock_location_id: updates.stockLocationId || parseInt(process.env.SELLIBRI_STOCK_LOCATION_ID || "1704") || 1704,
         available: updates.available,
       },
     ];
