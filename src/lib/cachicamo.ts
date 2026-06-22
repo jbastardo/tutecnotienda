@@ -89,7 +89,6 @@ export async function createProduct(product: {
         description: product.description || undefined,
         barcode: product.barcode || undefined,
         stock: product.stock || 0,
-        tax_id: 1,
       }),
     });
 
