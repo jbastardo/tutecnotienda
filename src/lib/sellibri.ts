@@ -50,6 +50,16 @@ export function getStoreDomain(): string {
   return "tutecnotienda.com";
 }
 
+export function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .substring(0, 100);
+}
+
 function getBaseUrl(): string {
   if (config.apiUrl) return config.apiUrl.replace(/\/+$/, "");
   if (config.storeDomain) {

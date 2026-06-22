@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts, isConfigured, getStoreDomain } from "@/lib/sellibri";
+import { fetchAllProducts, isConfigured, getStoreDomain, generateSlug } from "@/lib/sellibri";
 
 export async function POST(request: Request) {
   if (!isConfigured()) {
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
           margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
           supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
-          sellibriUrl: `https://${storeDomain}/p/${sp.slug || sp.sellibriId}`,
+          sellibriUrl: `https://${storeDomain}/p/${generateSlug(sp.title)}`,
           synced: true,
           status: "published",
           images: sp.images,
