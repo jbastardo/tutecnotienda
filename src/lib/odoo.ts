@@ -114,7 +114,6 @@ export async function getProductPrices(sku: string): Promise<any> {
     const uid = await authenticate();
     const models = createClient("/xmlrpc/2/object");
 
-    // Find product by SKU
     const ids = await call(models, "execute_kw", [
       odooConfig.db, uid, odooConfig.apiKey,
       "product.product",
@@ -124,23 +123,15 @@ export async function getProductPrices(sku: string): Promise<any> {
 
     if (!ids || ids.length === 0) return { error: "SKU no encontrado" };
 
-    // Read product with all price fields
-    const products = await call(models, "execute_kw", [
+    // Obtener TODA la info sin filtrar campos
+    const all = await call(models, "execute_kw", [
       odooConfig.db, uid, odooConfig.apiKey,
       "product.product",
       "read",
       [ids],
-      { fields: ["name", "default_code", "list_price", "lst_price", "standard_price", "qty_available"] },
     ]);
 
-    const p = products[0];
-    return {
-      sku: p.default_code,
-      name: p.name,
-      list_price: p.list_price || p.lst_price,
-      standard_price: p.standard_price,
-      qty_available: p.qty_available,
-    };
+    return { id: ids[0], fields: all[0] };
   } catch (e: any) {
     return { error: e.message || "Error" };
   }
