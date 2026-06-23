@@ -31,6 +31,8 @@ export default function ProductosPage() {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [minProfit, setMinProfit] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pub" | "pend">("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -107,6 +109,9 @@ export default function ProductosPage() {
     if (minPrice && Number(p.sellPrice) < Number(minPrice)) return false;
     if (maxPrice && Number(p.sellPrice) > Number(maxPrice)) return false;
     if (inStockOnly && Number(p.cost) <= 0) return false;
+    if (minProfit && Number(p.profit) < Number(minProfit)) return false;
+    if (statusFilter === "pub" && !p.synced) return false;
+    if (statusFilter === "pend" && p.synced) return false;
     return true;
   });
 
@@ -170,6 +175,12 @@ export default function ProductosPage() {
         <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
           <input type="checkbox" checked={inStockOnly} onChange={e => setInStockOnly(e.target.checked)} className="w-3.5 h-3.5"/> Con stock
         </label>
+        <input type="number" value={minProfit} onChange={e => setMinProfit(e.target.value)} placeholder="Utilidad min" className="w-24 rounded-lg border border-gray-300 px-2 py-2 text-xs"/>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="rounded-lg border border-gray-300 px-2 py-2 text-xs">
+          <option value="all">Estado: Todos</option>
+          <option value="pub">Publicados</option>
+          <option value="pend">Pendientes</option>
+        </select>
       </div>
 
       {filtered.length === 0 ? (
