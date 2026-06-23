@@ -35,19 +35,32 @@ export default function ProductosPage() {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    fetch("/api/productos?synced=true")
-      .then(r => r.json()).then(d => { setProducts(Array.isArray(d) ? d : []); setLoading(false); });
+    fetch("/api/productos?synced=true&limit=50&page=1")
+      .then(r => r.json()).then(d => { setProducts(Array.isArray(d) ? d : []); setLoading(false); setHasMore(d.length === 50); });
     fetch("/api/proveedores").then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : []));
     fetch("/api/tasas").then(r => r.json()).then(d => { if (d.bcv > 0) setRates(d); }).catch(() => {});
   }, []);
+
+  const loadMore = async () => {
+    const next = page + 1;
+    setPage(next);
+    const res = await fetch(`/api/productos?synced=true&limit=50&page=${next}`);
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      setProducts(prev => [...prev, ...data]);
+      setHasMore(data.length === 50);
+    }
+  };
 
   const syncToSellibri = async (id: string) => {
     setSyncing(id);
     const res = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
     setSyncing(null);
-    if (res.ok) fetch("/api/productos?synced=true").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
+    if (res.ok) fetch("/api/productos?synced=true&limit=50&page=1").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
   };
 
   const syncToTecnotizacion = async (id: string) => {
@@ -62,7 +75,7 @@ export default function ProductosPage() {
       await new Promise(r => setTimeout(r, 350));
     }
     setSelected(new Set());
-    fetch("/api/productos?synced=true").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
+    fetch("/api/productos?synced=true&limit=50&page=1").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
   };
 
   const bulkSyncTecnotizacion = async () => {
@@ -241,8 +254,15 @@ export default function ProductosPage() {
             </tbody>
           </table>
         </div>
-      )}
+        )}
         </>
+      )}
+      {hasMore && !loading && (
+        <div className="mt-4 text-center">
+          <button onClick={loadMore} className="text-sm text-blue-600 hover:underline">
+            Cargar mas productos...
+          </button>
+        </div>
       )}
     </div>
   );

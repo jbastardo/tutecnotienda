@@ -8,6 +8,8 @@ export async function GET(request: Request) {
   const supplierId = searchParams.get("supplierId");
   const sku = searchParams.get("sku");
   const notInList = searchParams.get("notInList");
+  const limit = parseInt(searchParams.get("limit") || "0");
+  const page = parseInt(searchParams.get("page") || "1");
 
   const where: Record<string, unknown> = {};
 
@@ -22,10 +24,15 @@ export async function GET(request: Request) {
     where.synced = true;
   }
 
+  const take = limit > 0 ? limit : 50;
+  const skip = limit > 0 ? 0 : (page - 1) * 50;
+
   const products = await prisma.product.findMany({
     where,
     include: { supplier: { select: { id: true, name: true, slug: true } } },
     orderBy: { createdAt: "desc" },
+    take,
+    skip,
   });
 
   return NextResponse.json(products);
