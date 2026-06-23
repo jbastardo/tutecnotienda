@@ -164,6 +164,43 @@ export async function fetchPricelistPrices(pricelistName = "Precio 4"): Promise<
   return skuPriceMap;
 }
 
+export async function fetchOdooBrands(): Promise<Map<string, string>> {
+  const uid = await authenticate();
+  const models = createClient("/xmlrpc/2/object");
+
+  const allProducts = await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.product",
+    "search_read",
+    [[["sale_ok", "=", true]]],
+    { fields: ["default_code", "brand_id"] },
+  ]);
+
+  // Get brand names
+  const brandIds = [...new Set(allProducts.map((p: any) => p.brand_id?.[0]).filter(Boolean))];
+  const brands = brandIds.length > 0 ? await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.brand",
+    "read",
+    [brandIds],
+    { fields: ["name"] },
+  ]) : [];
+
+  const brandMap = new Map<number, string>();
+  for (const b of brands) brandMap.set(b.id, b.name);
+
+  const skuBrandMap = new Map<string, string>();
+  for (const p of allProducts) {
+    const sku = p.default_code;
+    const brandId = p.brand_id?.[0];
+    if (sku && brandId && brandMap.has(brandId)) {
+      skuBrandMap.set(sku, brandMap.get(brandId)!);
+    }
+  }
+
+  return skuBrandMap;
+}
+
 export async function getProductPrices(sku: string): Promise<any> {
   try {
     const uid = await authenticate();

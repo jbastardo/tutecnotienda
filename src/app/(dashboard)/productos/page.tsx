@@ -37,6 +37,7 @@ export default function ProductosPage() {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncMsg, setSyncMsg] = useState("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
@@ -94,12 +95,19 @@ export default function ProductosPage() {
   };
 
   const bulkSyncSellibri = async () => {
-    for (const id of Array.from(selected)) {
+    const ids = Array.from(selected);
+    setSyncMsg(`Publicando ${ids.length}...`);
+    let done = 0;
+    for (const id of ids) {
       await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
+      done++;
+      setSyncMsg(`Publicando ${done}/${ids.length}...`);
       await new Promise(r => setTimeout(r, 350));
     }
+    setSyncMsg(`Publicados: ${done}`);
     setSelected(new Set());
-    fetch("/api/productos?synced=true&limit=50&page=1").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
+    fetchProducts();
+    setTimeout(() => setSyncMsg(""), 3000);
   };
 
   const bulkSyncTecnotizacion = async () => {
@@ -213,8 +221,8 @@ export default function ProductosPage() {
           </label>
           {selected.size > 0 && (
             <div className="flex items-center gap-2">
-              <button onClick={bulkSyncSellibri} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">
-                Publicar en Web ({selected.size})
+              <button onClick={bulkSyncSellibri} disabled={!!syncMsg} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 disabled:opacity-50">
+                {syncMsg || `Publicar en Web (${selected.size})`}
               </button>
               <button onClick={bulkSyncTecnotizacion} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700">
                 Enviar a Tecnotizacion ({selected.size})

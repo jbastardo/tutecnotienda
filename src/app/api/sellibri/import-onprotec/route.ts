@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchAllProducts } from "@/lib/sellibri";
-import { fetchPricelistPrices } from "@/lib/odoo";
+import { fetchPricelistPrices, fetchOdooBrands } from "@/lib/odoo";
 
 const ONPROTEC_CONFIG = {
   apiKey: "2uNyT2EUSyBVXx5yhYBS5AFPSbyhQqCp9MdupF3CyUGv6a9JtB1EtQTbwf7P6fqeLHjjAN2Z8uoMfnMrMv9usFMmwffGNTLeU2qP",
@@ -11,10 +11,24 @@ const ONPROTEC_CONFIG = {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { supplierId } = body;
+  const { supplierId, margin = "40" } = body;
+  const marginPct = Number(margin) / 100;
 
-  // Get Precio 4 from Odoo
+  // Auto-create or find Onprotec supplier
+  let effectiveSupplierId = supplierId;
+  if (!effectiveSupplierId) {
+    let supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
+    if (!supplier) {
+      supplier = await prisma.supplier.create({
+        data: { name: "Onprotec", slug: "onprotec", description: "Productos importados via API de onprotec.com" },
+      });
+    }
+    effectiveSupplierId = supplier.id;
+  }
+
+  // Get Precio 4 + brand info from Odoo
   const odooPriceMap = await fetchPricelistPrices("Precio 4");
+  const odooBrandMap = await fetchOdooBrands();
 
   const result = await fetchAllProducts(ONPROTEC_CONFIG, (page, total) => {
     console.log(`[Onprotec] Pagina ${page}/${total}`);
@@ -30,9 +44,11 @@ export async function POST(request: Request) {
 
   for (const sp of result.products) {
     try {
+      // Use Odoo pricelist price (Precio 4) if available, otherwise use variant cost
       const odooCost = sp.sku ? odooPriceMap.get(sp.sku) : undefined;
       const effectiveCost = odooCost || Number(sp.cost) || 0;
-      const sellPrice = effectiveCost * 1.40;
+      const sellPrice = effectiveCost * (1 + marginPct);
+      const brand = sp.sku ? (odooBrandMap.get(sp.sku) || null) : null;
       const profit = sellPrice - effectiveCost;
 
       // Skip if profit too low
@@ -64,10 +80,9 @@ export async function POST(request: Request) {
       const product = await prisma.product.create({
         data: {
           name: sp.title, description: sp.description || null, sku: sp.sku || null,
-          cost: effectiveCost, sellPrice, profit, margin: 0.40,
-          supplierId: supplierId || null,
-          sellibriId: null,
-          sellibriUrl: null,
+          cost: effectiveCost, sellPrice, profit, margin: marginPct,
+          supplierId: effectiveSupplierId,
+          sellibriId: null, sellibriUrl: null,
           synced: false, status: "draft", images: sp.images,
         },
       });
