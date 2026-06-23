@@ -6,16 +6,19 @@ import {
   LayoutDashboard,
   Truck,
   Package,
+  Upload,
   LogOut,
   ChevronRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/proveedores", label: "Proveedores", icon: Truck },
   { href: "/productos", label: "Productos", icon: Package },
+  { href: "/importar", label: "Importar", icon: Upload },
 ];
+
+import { cn } from "@/lib/utils";
 
 export default function DashboardLayout({
   children,
