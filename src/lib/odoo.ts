@@ -237,6 +237,29 @@ export async function fetchOdooCategories(): Promise<Map<string, string>> {
   return skuCatMap;
 }
 
+export async function fetchOdooStock(): Promise<Map<string, number>> {
+  const uid = await authenticate();
+  const models = createClient("/xmlrpc/2/object");
+
+  const allProducts = await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.product",
+    "search_read",
+    [[["sale_ok", "=", true], ["type", "=", "product"]]],
+    { fields: ["default_code", "qty_available"] },
+  ]);
+
+  const skuStockMap = new Map<string, number>();
+  for (const p of allProducts) {
+    const sku = p.default_code;
+    if (sku) {
+      skuStockMap.set(sku, p.qty_available || 0);
+    }
+  }
+
+  return skuStockMap;
+}
+
 export async function getProductPrices(sku: string): Promise<any> {
   try {
     const uid = await authenticate();

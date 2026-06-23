@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts, fetchTaxons } from "@/lib/sellibri";
-import { fetchPricelistPrices, fetchOdooBrands, fetchOdooCategories } from "@/lib/odoo";
+import { fetchAllProducts, fetchTaxons, createProduct } from "@/lib/sellibri";
+import { fetchPricelistPrices, fetchOdooBrands, fetchOdooCategories, fetchOdooStock } from "@/lib/odoo";
 
 const ONPROTEC_CONFIG = {
   apiKey: "2uNyT2EUSyBVXx5yhYBS5AFPSbyhQqCp9MdupF3CyUGv6a9JtB1EtQTbwf7P6fqeLHjjAN2Z8uoMfnMrMv9usFMmwffGNTLeU2qP",
@@ -14,7 +14,6 @@ export async function POST(request: Request) {
   const { supplierId, margin = "40" } = body;
   const marginPct = Number(margin) / 100;
 
-  // Auto-create or find Onprotec supplier
   let effectiveSupplierId = supplierId;
   if (!effectiveSupplierId) {
     let supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
@@ -26,8 +25,8 @@ export async function POST(request: Request) {
     effectiveSupplierId = supplier.id;
   }
 
-  // Get Precio 4 + brand info from Odoo + taxon map from tutecnotienda
   const odooPriceMap = await fetchPricelistPrices("Precio 4");
+  const odooStockMap = await fetchOdooStock();
   const odooBrandMap = await fetchOdooBrands();
   const odooCatMap = await fetchOdooCategories();
   const taxonMap = await fetchTaxons();
@@ -46,14 +45,13 @@ export async function POST(request: Request) {
 
   for (const sp of result.products) {
     try {
-      // Use Odoo pricelist price (Precio 4) if available, otherwise use variant cost
       const odooCost = sp.sku ? odooPriceMap.get(sp.sku) : undefined;
+      const odooStock = sp.sku ? (odooStockMap.get(sp.sku) || 0) : 0;
       const effectiveCost = odooCost || Number(sp.cost) || 0;
       const sellPrice = effectiveCost * (1 + marginPct);
       const brand = sp.sku ? (odooBrandMap.get(sp.sku) || null) : null;
       const profit = sellPrice - effectiveCost;
 
-      // Skip if profit too low
       if (profit <= 100) {
         skipped++;
         continue;
@@ -69,10 +67,10 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        if (Math.abs(Number(existing.cost) - effectiveCost) > 0.01) {
+        if (Math.abs(Number(existing.cost) - effectiveCost) > 0.01 || (existing.stock ?? 0) !== odooStock) {
           await prisma.product.update({
             where: { id: existing.id },
-            data: { name: sp.title, cost: effectiveCost, sellPrice, profit, margin: 0.40, images: sp.images.length > 0 ? sp.images : existing.images },
+            data: { name: sp.title, cost: effectiveCost, sellPrice, profit, margin: 0.40, stock: odooStock, brand, images: sp.images.length > 0 ? sp.images : existing.images },
           });
           updated++;
         } else { skipped++; }
@@ -82,7 +80,7 @@ export async function POST(request: Request) {
       const product = await prisma.product.create({
         data: {
           name: sp.title, description: sp.description || null, sku: sp.sku || null,
-          cost: effectiveCost, sellPrice, profit, margin: marginPct,
+          cost: effectiveCost, sellPrice, profit, margin: marginPct, stock: odooStock, brand,
           supplierId: effectiveSupplierId,
           sellibriId: null, sellibriUrl: null,
           synced: false, status: "draft", images: sp.images,
@@ -90,31 +88,22 @@ export async function POST(request: Request) {
       });
       imported++;
 
-      // Auto-sync to tutecnotienda.com
       if (sp.sku) {
         try {
-          const syncRes = await fetch(`${process.env.SELLIBRI_API_URL || "https://tutecnotienda.com/api/v1"}/products`, {
-            method: "POST",
-            headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
-            body: JSON.stringify({
-              product: {
-                title: sp.title, sku: sp.sku, status: "active",
-                master_attributes: { price: String(sellPrice.toFixed(2)), cost: String(effectiveCost.toFixed(2)), sku: sp.sku },
-              },
-            }),
+          const syncResult = await createProduct({
+            title: sp.title,
+            price: sellPrice,
+            cost: effectiveCost,
+            sku: sp.sku,
+            status: "active",
+            tags: ["onprotec", "tutecnotienda"],
+            available: odooStock,
           });
-          if (syncRes.ok) {
-            const syncData = await syncRes.json();
-            const newId = syncData.product?.id || syncData.id;
-            if (newId) {
-              await prisma.product.update({
-                where: { id: product.id },
-                data: { synced: true, sellibriId: String(newId), sellibriUrl: `https://tutecnotienda.com/p/${newId}`, status: "published" },
-              });
-            }
-          } else {
-            const errText = await syncRes.text().catch(() => "unknown");
-            console.error("[Onprotec] Sync failed:", syncRes.status, errText.slice(0, 300));
+          if (syncResult?.id) {
+            await prisma.product.update({
+              where: { id: product.id },
+              data: { synced: true, sellibriId: String(syncResult.id), sellibriUrl: `https://tutecnotienda.com/p/${syncResult.slug}`, status: "published" },
+            });
           }
         } catch (e) { console.error("[Onprotec] Sync error:", e); }
       }

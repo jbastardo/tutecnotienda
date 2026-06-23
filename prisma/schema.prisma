@@ -89,6 +89,8 @@ model Product {
   sellibriUrl String?
   synced      Boolean  @default(false)
   images      String[] @default([])
+  stock       Int      @default(0)
+  brand       String?
   status      String   @default("draft")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

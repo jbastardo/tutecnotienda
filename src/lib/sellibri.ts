@@ -14,6 +14,7 @@ interface SellibriProductData {
   images?: string[];
   tags?: string[];
   status?: "draft" | "active";
+  available?: number;
 }
 
 interface SellibriProductResponse {
@@ -183,6 +184,12 @@ export async function createProduct(
         sku: product.sku || undefined,
         track_inventory: true,
         images_attributes: imagesAttributes.length > 0 ? imagesAttributes : undefined,
+        ...(product.available !== undefined ? {
+          stock_items_attributes: [{
+            stock_location_id: parseInt(process.env.SELLIBRI_STOCK_LOCATION_ID || "1704") || 1704,
+            available: product.available,
+          }],
+        } : {}),
       },
     },
   };
