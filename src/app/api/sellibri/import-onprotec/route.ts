@@ -78,12 +78,37 @@ export async function POST(request: Request) {
           supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
           sellibriUrl: `https://onprotec.com/p/${sp.slug || sp.sellibriId}`,
-          synced: true,
-          status: "published",
+          synced: false,
+          status: "draft",
           images: sp.images,
         },
       });
       imported++;
+
+      // Auto-sync to tutecnotienda.com if profit > 100
+      if (profit > 100 && sp.sku) {
+        try {
+          await fetch(`${process.env.SELLIBRI_API_URL || "https://tutecnotienda.com/api/v1"}/products`, {
+            method: "POST",
+            headers: {
+              "X-Api-Key": process.env.SELLIBRI_API_KEY || "",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              product: {
+                title: sp.title,
+                sku: sp.sku,
+                status: "active",
+                master_attributes: {
+                  price: String(sellPrice.toFixed(2)),
+                  cost: String(effectiveCost.toFixed(2)),
+                  sku: sp.sku,
+                },
+              },
+            }),
+          });
+        } catch {}
+      }
     } catch (e) {
       skipped++;
     }
