@@ -201,6 +201,42 @@ export async function fetchOdooBrands(): Promise<Map<string, string>> {
   return skuBrandMap;
 }
 
+export async function fetchOdooCategories(): Promise<Map<string, string>> {
+  const uid = await authenticate();
+  const models = createClient("/xmlrpc/2/object");
+
+  const allProducts = await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.product",
+    "search_read",
+    [[["sale_ok", "=", true]]],
+    { fields: ["default_code", "categ_id"] },
+  ]);
+
+  const catIds = [...new Set(allProducts.map((p: any) => p.categ_id?.[0]).filter(Boolean))];
+  const cats = catIds.length > 0 ? await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.category",
+    "read",
+    [catIds],
+    { fields: ["name"] },
+  ]) : [];
+
+  const catMap = new Map<number, string>();
+  for (const c of cats) catMap.set(c.id, c.name);
+
+  const skuCatMap = new Map<string, string>();
+  for (const p of allProducts) {
+    const sku = p.default_code;
+    const catId = p.categ_id?.[0];
+    if (sku && catId && catMap.has(catId)) {
+      skuCatMap.set(sku, catMap.get(catId)!);
+    }
+  }
+
+  return skuCatMap;
+}
+
 export async function getProductPrices(sku: string): Promise<any> {
   try {
     const uid = await authenticate();

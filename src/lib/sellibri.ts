@@ -126,6 +126,33 @@ export async function searchProductBySku(sku: string) {
   }
 }
 
+export async function fetchTaxons(): Promise<Map<string, number>> {
+  if (!isConfigured()) return new Map();
+
+  const baseUrl = getBaseUrl();
+  const nameToId = new Map<string, number>();
+
+  try {
+    // Get all taxonomies
+    const taxRes = await fetch(`${baseUrl}/taxonomies`, { headers: headers() });
+    if (!taxRes.ok) return nameToId;
+    const taxonomies = await taxRes.json();
+
+    for (const tax of (taxonomies.taxonomies || taxonomies || [])) {
+      const res = await fetch(`${baseUrl}/taxonomies/${tax.id}/taxons`, { headers: headers() });
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const t of (data.taxons || data || [])) {
+        if (t.name) nameToId.set(t.name.toLowerCase(), t.id);
+      }
+    }
+  } catch (e) {
+    console.error("[Sellibri] Error fetching taxons:", e);
+  }
+
+  return nameToId;
+}
+
 export async function createProduct(
   product: SellibriProductData
 ): Promise<SellibriProductResponse | null> {

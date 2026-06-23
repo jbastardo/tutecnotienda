@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts } from "@/lib/sellibri";
-import { fetchPricelistPrices, fetchOdooBrands } from "@/lib/odoo";
+import { fetchAllProducts, fetchTaxons } from "@/lib/sellibri";
+import { fetchPricelistPrices, fetchOdooBrands, fetchOdooCategories } from "@/lib/odoo";
 
 const ONPROTEC_CONFIG = {
   apiKey: "2uNyT2EUSyBVXx5yhYBS5AFPSbyhQqCp9MdupF3CyUGv6a9JtB1EtQTbwf7P6fqeLHjjAN2Z8uoMfnMrMv9usFMmwffGNTLeU2qP",
@@ -26,9 +26,11 @@ export async function POST(request: Request) {
     effectiveSupplierId = supplier.id;
   }
 
-  // Get Precio 4 + brand info from Odoo
+  // Get Precio 4 + brand info from Odoo + taxon map from tutecnotienda
   const odooPriceMap = await fetchPricelistPrices("Precio 4");
   const odooBrandMap = await fetchOdooBrands();
+  const odooCatMap = await fetchOdooCategories();
+  const taxonMap = await fetchTaxons();
 
   const result = await fetchAllProducts(ONPROTEC_CONFIG, (page, total) => {
     console.log(`[Onprotec] Pagina ${page}/${total}`);
@@ -91,17 +93,20 @@ export async function POST(request: Request) {
       // Auto-sync to tutecnotienda.com
       if (sp.sku) {
         try {
+          const odooCat = odooCatMap.get(sp.sku) || "";
+          const taxonId = taxonMap.get(odooCat.toLowerCase());
+          const body: any = {
+            product: {
+              title: sp.title, sku: sp.sku, status: "active",
+              master_attributes: { price: String(sellPrice.toFixed(2)), cost: String(effectiveCost.toFixed(2)), sku: sp.sku },
+            },
+          };
+          if (taxonId) body.product.taxon_ids = [taxonId];
+
           const syncRes = await fetch(`${process.env.SELLIBRI_API_URL || "https://tutecnotienda.com/api/v1"}/products`, {
             method: "POST",
             headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
-            body: JSON.stringify({
-              product: {
-                title: sp.title,
-                sku: sp.sku,
-                status: "active",
-                master_attributes: { price: String(sellPrice.toFixed(2)), cost: String(effectiveCost.toFixed(2)), sku: sp.sku },
-              },
-            }),
+            body: JSON.stringify(body),
           });
           if (syncRes.ok) {
             const syncData = await syncRes.json();
