@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchAllProducts, getStoreDomain, generateSlug } from "@/lib/sellibri";
 
 const ONPROTEC_CONFIG = {
-  apiKey: "2a7885a7768c6543517cfd74f0a32a8241a9ba72",
+  apiKey: "2uNyT2EUSyBVXx5yhYBS5AFPSbyhQqCp9MdupF3CyUGv6a9JtB1EtQTbwf7P6fqeLHjjAN2Z8uoMfnMrMv9usFMmwffGNTLeU2qP",
   apiUrl: "https://onprotec.com/api/v1",
   storeDomain: "onprotec.com",
 };
