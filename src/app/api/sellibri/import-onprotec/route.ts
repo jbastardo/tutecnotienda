@@ -25,11 +25,17 @@ export async function POST(request: Request) {
     effectiveSupplierId = supplier.id;
   }
 
+  console.log("[Onprotec] Cargando datos de Odoo...");
   const odooPriceMap = await fetchPricelistPrices("Precio 4");
+  console.log(`[Onprotec] Precio 4: ${odooPriceMap.size} SKUs con precio`);
   const odooStockMap = await fetchOdooStock();
+  console.log(`[Onprotec] Stock Odoo: ${odooStockMap.size} SKUs con stock`);
   const odooBrandMap = await fetchOdooBrands();
+  console.log(`[Onprotec] Marcas Odoo: ${odooBrandMap.size} SKUs`);
   const odooCatMap = await fetchOdooCategories();
+  console.log(`[Onprotec] Categorias Odoo: ${odooCatMap.size} SKUs`);
   const taxonMap = await fetchTaxons();
+  console.log(`[Onprotec] Taxones Sellibri: ${taxonMap.size}`);
 
   const result = await fetchAllProducts(ONPROTEC_CONFIG, (page, total) => {
     console.log(`[Onprotec] Pagina ${page}/${total}`);
@@ -42,6 +48,10 @@ export async function POST(request: Request) {
   let imported = 0;
   let updated = 0;
   let skipped = 0;
+  let skippedNoProfit = 0;
+  let skippedExisting = 0;
+  let skippedError = 0;
+  let sampleLogged = 0;
 
   for (const sp of result.products) {
     try {
@@ -54,6 +64,11 @@ export async function POST(request: Request) {
 
       if (profit <= 100) {
         skipped++;
+        skippedNoProfit++;
+        if (sampleLogged < 5) {
+          console.log(`[Onprotec] SKIP (profit) "${sp.title}" SKU=${sp.sku} cost=${effectiveCost} sell=${sellPrice.toFixed(2)} profit=${profit.toFixed(2)}`);
+          sampleLogged++;
+        }
         continue;
       }
 
@@ -73,7 +88,7 @@ export async function POST(request: Request) {
             data: { name: sp.title, cost: effectiveCost, sellPrice, profit, margin: 0.40, stock: odooStock, brand, images: sp.images.length > 0 ? sp.images : existing.images },
           });
           updated++;
-        } else { skipped++; }
+        } else { skipped++; skippedExisting++; }
         continue;
       }
 
@@ -107,13 +122,18 @@ export async function POST(request: Request) {
           }
         } catch (e) { console.error("[Onprotec] Sync error:", e); }
       }
-    } catch (e) { skipped++; }
+    } catch (e) { skipped++; skippedError++; }
   }
+
+  console.log(`[Onprotec] RESULTADO: total=${result.products.length} importado=${imported} actualizado=${updated} saltado=${skipped} (sinProfit=${skippedNoProfit} existentes=${skippedExisting} errores=${skippedError})`);
 
   return NextResponse.json({
     total: result.products.length,
     imported,
     updated,
     skipped,
+    skippedNoProfit,
+    skippedExisting,
+    skippedError,
   });
 }
