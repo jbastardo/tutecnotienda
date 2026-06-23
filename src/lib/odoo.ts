@@ -109,6 +109,61 @@ export async function fetchProducts(): Promise<OdooProduct[]> {
   }));
 }
 
+export async function fetchPricelistPrices(pricelistName = "Precio 4"): Promise<Map<string, number>> {
+  const uid = await authenticate();
+  const models = createClient("/xmlrpc/2/object");
+
+  // Find the pricelist by name
+  const plIds = await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.pricelist",
+    "search",
+    [[["name", "ilike", pricelistName]]],
+  ]);
+
+  if (!plIds || plIds.length === 0) return new Map();
+
+  // Get all pricelist items for this pricelist
+  const items = await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.pricelist.item",
+    "search_read",
+    [[["pricelist_id", "in", plIds]]],
+    { fields: ["product_tmpl_id", "fixed_price"] },
+  ]);
+
+  // Map product template ID -> price
+  const priceMap = new Map<number, number>();
+  for (const item of items) {
+    const tmplId = item.product_tmpl_id?.[0];
+    if (tmplId && item.fixed_price > 0) {
+      priceMap.set(tmplId, item.fixed_price);
+    }
+  }
+
+  // Get all products with their template IDs and SKUs
+  const allProducts = await call(models, "execute_kw", [
+    odooConfig.db, uid, odooConfig.apiKey,
+    "product.product",
+    "search_read",
+    [[["sale_ok", "=", true], ["type", "=", "product"]]],
+    { fields: ["default_code", "product_tmpl_id"] },
+  ]);
+
+  // Map SKU -> Precio 4
+  const skuPriceMap = new Map<string, number>();
+  for (const p of allProducts) {
+    const sku = p.default_code;
+    const tmplId = p.product_tmpl_id?.[0];
+    const price = tmplId ? priceMap.get(tmplId) : undefined;
+    if (sku && price) {
+      skuPriceMap.set(sku, price);
+    }
+  }
+
+  return skuPriceMap;
+}
+
 export async function getProductPrices(sku: string): Promise<any> {
   try {
     const uid = await authenticate();

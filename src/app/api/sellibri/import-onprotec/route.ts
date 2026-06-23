@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts, getStoreDomain, generateSlug } from "@/lib/sellibri";
+import { fetchAllProducts } from "@/lib/sellibri";
+import { fetchPricelistPrices } from "@/lib/odoo";
 
 const ONPROTEC_CONFIG = {
   apiKey: "2uNyT2EUSyBVXx5yhYBS5AFPSbyhQqCp9MdupF3CyUGv6a9JtB1EtQTbwf7P6fqeLHjjAN2Z8uoMfnMrMv9usFMmwffGNTLeU2qP",
@@ -11,6 +12,9 @@ const ONPROTEC_CONFIG = {
 export async function POST(request: Request) {
   const body = await request.json();
   const { supplierId } = body;
+
+  // Get Precio 4 from Odoo
+  const odooPriceMap = await fetchPricelistPrices("Precio 4");
 
   const result = await fetchAllProducts(ONPROTEC_CONFIG, (page, total) => {
     console.log(`[Onprotec] Pagina ${page}/${total}`);
@@ -26,6 +30,12 @@ export async function POST(request: Request) {
 
   for (const sp of result.products) {
     try {
+      // Use Odoo pricelist price (Precio 4) if available, otherwise use variant cost
+      const odooCost = sp.sku ? odooPriceMap.get(sp.sku) : undefined;
+      const effectiveCost = odooCost || Number(sp.cost) || 0;
+      const sellPrice = effectiveCost * 1.40;
+      const profit = sellPrice - effectiveCost;
+
       const existing = await prisma.product.findFirst({
         where: {
           OR: [
@@ -36,18 +46,23 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        await prisma.product.update({
-          where: { id: existing.id },
-          data: {
-            name: sp.title,
-            cost: sp.cost,
-            sellPrice: sp.price,
-            profit: sp.price - sp.cost,
-            margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
-            images: sp.images.length > 0 ? sp.images : existing.images,
-          },
-        });
-        updated++;
+        // Only update if price changed
+        if (Math.abs(Number(existing.cost) - effectiveCost) > 0.01) {
+          await prisma.product.update({
+            where: { id: existing.id },
+            data: {
+              name: sp.title,
+              cost: effectiveCost,
+              sellPrice,
+              profit,
+              margin: 0.40,
+              images: sp.images.length > 0 ? sp.images : existing.images,
+            },
+          });
+          updated++;
+        } else {
+          skipped++;
+        }
         continue;
       }
 
@@ -56,10 +71,10 @@ export async function POST(request: Request) {
           name: sp.title,
           description: sp.description || null,
           sku: sp.sku || null,
-          cost: sp.cost,
-          sellPrice: sp.price,
-          profit: sp.price - sp.cost,
-          margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
+          cost: effectiveCost,
+          sellPrice,
+          profit,
+          margin: 0.40,
           supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
           sellibriUrl: `https://onprotec.com/p/${sp.slug || sp.sellibriId}`,
