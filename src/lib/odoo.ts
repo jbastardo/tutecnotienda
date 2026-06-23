@@ -123,15 +123,51 @@ export async function getProductPrices(sku: string): Promise<any> {
 
     if (!ids || ids.length === 0) return { error: "SKU no encontrado" };
 
-    // Obtener TODA la info sin filtrar campos
-    const all = await call(models, "execute_kw", [
+    const pid = ids[0];
+
+    // Get product basic info
+    const [prod] = await call(models, "execute_kw", [
       odooConfig.db, uid, odooConfig.apiKey,
       "product.product",
       "read",
-      [ids],
+      [[pid]],
+      { fields: ["name", "default_code", "list_price", "standard_price", "product_tmpl_id"] },
     ]);
 
-    return { id: ids[0], fields: all[0] };
+    // Get pricelist items for this product template
+    const tmplId = prod.product_tmpl_id?.[0];
+    const pricelistItems = tmplId ? await call(models, "execute_kw", [
+      odooConfig.db, uid, odooConfig.apiKey,
+      "product.pricelist.item",
+      "search_read",
+      [[["product_tmpl_id", "=", tmplId]]],
+      { fields: ["name", "fixed_price", "min_quantity", "pricelist_id"] },
+    ]) : [];
+
+    // Get pricelist names
+    const plIds = [...new Set(pricelistItems.map((i: any) => i.pricelist_id?.[0]).filter(Boolean))];
+    const pricelists = plIds.length > 0 ? await call(models, "execute_kw", [
+      odooConfig.db, uid, odooConfig.apiKey,
+      "product.pricelist",
+      "read",
+      [plIds],
+      { fields: ["name"] },
+    ]) : [];
+
+    const plMap = new Map(pricelists.map((p: any) => [p.id, p.name]));
+
+    return {
+      sku: prod.default_code,
+      name: prod.name,
+      list_price: prod.list_price,
+      standard_price: prod.standard_price,
+      pricelist_items: pricelistItems.map((i: any) => ({
+        pricelist: plMap.get(i.pricelist_id?.[0]) || i.pricelist_id,
+        fixed_price: i.fixed_price,
+        min_quantity: i.min_quantity,
+        name: i.name,
+      })),
+    };
   } catch (e: any) {
     return { error: e.message || "Error" };
   }
