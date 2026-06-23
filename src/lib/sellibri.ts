@@ -149,6 +149,7 @@ export async function createProduct(
       status: product.status || "draft",
       vendor_name: product.vendorName || undefined,
       tag_names: product.tags || [],
+      taxon_ids: process.env.SELLIBRI_DEFAULT_TAXON_ID ? [parseInt(process.env.SELLIBRI_DEFAULT_TAXON_ID)] : undefined,
       master_attributes: {
         price: String(product.price),
         cost: String(product.cost),
