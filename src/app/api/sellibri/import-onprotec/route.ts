@@ -66,8 +66,8 @@ export async function POST(request: Request) {
           name: sp.title, description: sp.description || null, sku: sp.sku || null,
           cost: effectiveCost, sellPrice, profit, margin: 0.40,
           supplierId: supplierId || null,
-          sellibriId: String(sp.sellibriId),
-          sellibriUrl: `https://onprotec.com/p/${sp.slug || sp.sellibriId}`,
+          sellibriId: null,
+          sellibriUrl: null,
           synced: false, status: "draft", images: sp.images,
         },
       });
@@ -90,12 +90,16 @@ export async function POST(request: Request) {
           });
           if (syncRes.ok) {
             const syncData = await syncRes.json();
+            const newId = syncData.product?.id || syncData.id;
             await prisma.product.update({
               where: { id: product.id },
-              data: { synced: true, sellibriId: String(syncData.product?.id || sp.sellibriId), status: "published" },
+              data: {
+                synced: true,
+                sellibriId: newId ? String(newId) : null,
+                sellibriUrl: newId ? `https://tutecnotienda.com/p/${newId}` : null,
+                status: "published",
+              },
             });
-          } else {
-            console.error("[Onprotec] Error sync:", await syncRes.text().catch(() => ""));
           }
         } catch (e) { console.error("[Onprotec] Sync error:", e); }
       }
