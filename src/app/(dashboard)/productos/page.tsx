@@ -96,18 +96,19 @@ export default function ProductosPage() {
 
   const bulkSyncSellibri = async () => {
     const ids = Array.from(selected);
+    let done = 0, errors = 0;
     setSyncMsg(`Publicando ${ids.length}...`);
-    let done = 0;
     for (const id of ids) {
-      await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
-      done++;
-      setSyncMsg(`Publicando ${done}/${ids.length}...`);
+      const res = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
+      const data = await res.json();
+      if (data.success) done++; else errors++;
+      setSyncMsg(`${done + errors}/${ids.length} (${errors} err)`);
       await new Promise(r => setTimeout(r, 350));
     }
-    setSyncMsg(`Publicados: ${done}`);
+    setSyncMsg(`${done} ok, ${errors} err`);
     setSelected(new Set());
     fetchProducts();
-    setTimeout(() => setSyncMsg(""), 3000);
+    setTimeout(() => setSyncMsg(""), 5000);
   };
 
   const bulkSyncTecnotizacion = async () => {
