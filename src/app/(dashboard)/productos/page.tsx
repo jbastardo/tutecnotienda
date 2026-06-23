@@ -693,6 +693,18 @@ export default function SubirListaPage() {
                 }} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                   De Tecnotizacion
                 </button>
+                <button onClick={async () => {
+                  if (!confirm("Importar productos de Onprotec?")) return;
+                  try {
+                    const res = await fetch("/api/sellibri/import-onprotec", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
+                    const data = await res.json();
+                    if (res.ok) alert(`Importados: ${data.imported} nuevos, ${data.updated} actualizados`);
+                    else alert(data.error || "Error");
+                    fetchCatalog();
+                  } catch { alert("Error de conexion"); }
+                }} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700">
+                  De Onprotec
+                </button>
               </div>
             </div>
           )}
