@@ -34,6 +34,7 @@ export default function ImportarPage() {
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState("");
   const [margin, setMargin] = useState("40");
+  const [progressMsg, setProgressMsg] = useState("");
 
   useEffect(() => {
     fetch("/api/proveedores").then(r => r.json()).then(setSuppliers);
@@ -158,27 +159,39 @@ export default function ImportarPage() {
             <div className="space-y-2">
               <button onClick={async () => {
                 if (!confirm("Importar de tutecnotienda.com?")) return;
+                setProgressMsg("Importando de Sellibri...");
                 const res = await fetch("/api/sellibri/import", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
                 const data = await res.json();
+                setProgressMsg("");
                 alert(res.ok ? `OK: ${data.imported} nuevos, ${data.updated || 0} actualizados` : data.error);
-              }} className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 flex items-center justify-center gap-2">
-                <Download className="h-4 w-4"/>De Sellibri (tutecnotienda.com)
+              }} disabled={!!progressMsg}
+                className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+                {progressMsg || "De Sellibri"}
               </button>
               <button onClick={async () => {
                 if (!confirm("Importar de Onprotec?")) return;
+                setProgressMsg("Importando de Onprotec (Precio 4)...");
                 const res = await fetch("/api/sellibri/import-onprotec", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
                 const data = await res.json();
+                setProgressMsg("");
                 alert(res.ok ? `OK: ${data.imported} nuevos, ${data.updated || 0} actualizados` : data.error);
-              }} className="w-full rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-700 flex items-center justify-center gap-2">
-                <Download className="h-4 w-4"/>De Onprotec (Precio 4)
+              }} disabled={!!progressMsg}
+                className="w-full rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+                {progressMsg || "De Onprotec (Precio 4)"}
               </button>
               <button onClick={async () => {
                 if (!confirm("Importar de Tecnotizacion?")) return;
+                setProgressMsg("Importando de Tecnotizacion...");
                 const res = await fetch("/api/tecnotizacion/import", { method: "POST", credentials: "include" });
                 const data = await res.json();
+                setProgressMsg("");
                 alert(res.ok ? `OK: ${data.imported} locales, ${data.synced} a la web` : data.error);
-              }} className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 flex items-center justify-center gap-2">
-                <Download className="h-4 w-4"/>De Tecnotizacion
+              }} disabled={!!progressMsg}
+                className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+                {progressMsg || "De Tecnotizacion"}
               </button>
             </div>
           </div>

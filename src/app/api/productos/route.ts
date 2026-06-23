@@ -64,6 +64,7 @@ export async function POST(request: Request) {
         margin: plp.margin,
         supplierId: plp.priceList.supplierId,
         status: "draft",
+        images: plp.imageUrl ? [plp.imageUrl] : [],
         supplierProducts: {
           create: {
             supplierId: plp.priceList.supplierId,
