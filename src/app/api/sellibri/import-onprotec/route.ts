@@ -93,33 +93,28 @@ export async function POST(request: Request) {
       // Auto-sync to tutecnotienda.com
       if (sp.sku) {
         try {
-          const odooCat = odooCatMap.get(sp.sku) || "";
-          const taxonId = taxonMap.get(odooCat.toLowerCase());
-          const body: any = {
-            product: {
-              title: sp.title, sku: sp.sku, status: "active",
-              master_attributes: { price: String(sellPrice.toFixed(2)), cost: String(effectiveCost.toFixed(2)), sku: sp.sku },
-            },
-          };
-          if (taxonId) body.product.taxon_ids = [taxonId];
-
           const syncRes = await fetch(`${process.env.SELLIBRI_API_URL || "https://tutecnotienda.com/api/v1"}/products`, {
             method: "POST",
             headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+            body: JSON.stringify({
+              product: {
+                title: sp.title, sku: sp.sku, status: "active",
+                master_attributes: { price: String(sellPrice.toFixed(2)), cost: String(effectiveCost.toFixed(2)), sku: sp.sku },
+              },
+            }),
           });
           if (syncRes.ok) {
             const syncData = await syncRes.json();
             const newId = syncData.product?.id || syncData.id;
-            await prisma.product.update({
-              where: { id: product.id },
-              data: {
-                synced: true,
-                sellibriId: newId ? String(newId) : null,
-                sellibriUrl: newId ? `https://tutecnotienda.com/p/${newId}` : null,
-                status: "published",
-              },
-            });
+            if (newId) {
+              await prisma.product.update({
+                where: { id: product.id },
+                data: { synced: true, sellibriId: String(newId), sellibriUrl: `https://tutecnotienda.com/p/${newId}`, status: "published" },
+              });
+            }
+          } else {
+            const errText = await syncRes.text().catch(() => "unknown");
+            console.error("[Onprotec] Sync failed:", syncRes.status, errText.slice(0, 300));
           }
         } catch (e) { console.error("[Onprotec] Sync error:", e); }
       }
