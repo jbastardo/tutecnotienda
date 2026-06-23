@@ -45,9 +45,30 @@ export default function ProductosPage() {
 
   const syncToSellibri = async (id: string) => {
     setSyncing(id);
-    await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
+    const res = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
     setSyncing(null);
+    if (res.ok) fetch("/api/productos?synced=true").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
+  };
+
+  const syncToTecnotizacion = async (id: string) => {
+    setSyncing(id);
+    await fetch("/api/tecnotizacion/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productIds: [id]}), credentials: "include" });
+    setSyncing(null);
+  };
+
+  const bulkSyncSellibri = async () => {
+    for (const id of Array.from(selected)) {
+      await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
+      await new Promise(r => setTimeout(r, 350));
+    }
+    setSelected(new Set());
     fetch("/api/productos?synced=true").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
+  };
+
+  const bulkSyncTecnotizacion = async () => {
+    const ids = Array.from(selected);
+    await fetch("/api/tecnotizacion/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productIds: ids}), credentials: "include" });
+    setSelected(new Set());
   };
 
   const toggleSelect = (id: string) => {
@@ -148,17 +169,14 @@ export default function ProductosPage() {
             {selected.size > 0 ? `${selected.size} seleccionados` : "Seleccionar todos"}
           </label>
           {selected.size > 0 && (
-            <button onClick={async () => {
-              for (const id of Array.from(selected)) {
-                await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
-                await new Promise(r => setTimeout(r, 350));
-              }
-              alert("Sincronizados: " + selected.size);
-              setSelected(new Set());
-              fetch("/api/productos?synced=true").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
-            }} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700">
-              Sincronizar seleccion ({selected.size})
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={bulkSyncSellibri} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">
+                Publicar en Web ({selected.size})
+              </button>
+              <button onClick={bulkSyncTecnotizacion} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700">
+                Enviar a Tecnotizacion ({selected.size})
+              </button>
+            </div>
           )}
         </div>
         {viewMode === "grid" ? (
