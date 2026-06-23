@@ -34,6 +34,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ status: res.status, raw: parsed });
   }
 
+  if (mode === "create") {
+    const sku = url.searchParams.get("sku") || "TEST-" + Date.now();
+    const name = url.searchParams.get("name") || "Producto de Prueba API";
+    const price = parseFloat(url.searchParams.get("price") || "99.99");
+
+    const res = await fetch("https://tutecnotienda.com/api/v1/products", {
+      method: "POST",
+      headers: {
+        "X-Api-Key": process.env.SELLIBRI_API_KEY || "",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        product: {
+          title: name,
+          sku: sku,
+          status: "active",
+          master_attributes: { price: String(price), sku: sku, cost: "50.00", track_inventory: true },
+        },
+      }),
+    });
+    const text = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+    return NextResponse.json({ status: res.status, body: parsed });
+  }
+
   const result = await testConnection();
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
 }
