@@ -38,26 +38,35 @@ export async function GET(request: Request) {
     const sku = url.searchParams.get("sku") || "TEST-" + Date.now();
     const name = url.searchParams.get("name") || "Producto de Prueba API";
     const price = parseFloat(url.searchParams.get("price") || "99.99");
+    const taxonId = url.searchParams.get("taxon") || "";
+
+    const body: any = {
+      product: {
+        title: name, sku, status: "active",
+        master_attributes: { price: String(price), sku, cost: "50.00", track_inventory: true },
+      },
+    };
+    if (taxonId) body.product.taxon_ids = [parseInt(taxonId)];
 
     const res = await fetch("https://tutecnotienda.com/api/v1/products", {
       method: "POST",
-      headers: {
-        "X-Api-Key": process.env.SELLIBRI_API_KEY || "",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        product: {
-          title: name,
-          sku: sku,
-          status: "active",
-          master_attributes: { price: String(price), sku: sku, cost: "50.00", track_inventory: true },
-        },
-      }),
+      headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
     const text = await res.text();
     let parsed;
     try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
     return NextResponse.json({ status: res.status, body: parsed });
+  }
+
+  if (mode === "taxons") {
+    const res = await fetch("https://tutecnotienda.com/api/v1/taxonomies", {
+      headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
+    });
+    const text = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = { raw: text.slice(0, 500) }; }
+    return NextResponse.json({ status: res.status, taxonomies: parsed });
   }
 
   const result = await testConnection();
