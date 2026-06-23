@@ -114,6 +114,7 @@ export async function getProductPrices(sku: string): Promise<any> {
     const uid = await authenticate();
     const models = createClient("/xmlrpc/2/object");
 
+    // Find product
     const ids = await call(models, "execute_kw", [
       odooConfig.db, uid, odooConfig.apiKey,
       "product.product",
@@ -122,50 +123,61 @@ export async function getProductPrices(sku: string): Promise<any> {
     ]);
 
     if (!ids || ids.length === 0) return { error: "SKU no encontrado" };
-
     const pid = ids[0];
 
-    // Get product basic info
+    // Get product info
     const [prod] = await call(models, "execute_kw", [
       odooConfig.db, uid, odooConfig.apiKey,
       "product.product",
       "read",
       [[pid]],
-      { fields: ["name", "default_code", "list_price", "standard_price", "product_tmpl_id"] },
+      { fields: ["name", "default_code", "product_tmpl_id"] },
     ]);
 
-    // Get pricelist items for this product template
+    // Get user's assigned pricelist
+    const userInfo = await call(models, "execute_kw", [
+      odooConfig.db, uid, odooConfig.apiKey,
+      "res.users",
+      "read",
+      [[uid]],
+      { fields: ["property_product_pricelist"] },
+    ]);
+
+    const userPricelistId = userInfo[0]?.property_product_pricelist?.[0];
+
+    // Get pricelist items for this product
     const tmplId = prod.product_tmpl_id?.[0];
-    const pricelistItems = tmplId ? await call(models, "execute_kw", [
+    const domain = [["product_tmpl_id", "=", tmplId]];
+    if (userPricelistId) domain.push(["pricelist_id", "=", userPricelistId]);
+
+    const items = await call(models, "execute_kw", [
       odooConfig.db, uid, odooConfig.apiKey,
       "product.pricelist.item",
       "search_read",
-      [[["product_tmpl_id", "=", tmplId]]],
-      { fields: ["name", "fixed_price", "min_quantity", "pricelist_id"] },
-    ]) : [];
+      [domain],
+      { fields: ["name", "fixed_price", "pricelist_id", "min_quantity"] },
+    ]);
 
-    // Get pricelist names
-    const plIds = [...new Set(pricelistItems.map((i: any) => i.pricelist_id?.[0]).filter(Boolean))];
-    const pricelists = plIds.length > 0 ? await call(models, "execute_kw", [
+    // Also get the computed price via Odoo's price computation
+    const price = userPricelistId ? await call(models, "execute_kw", [
       odooConfig.db, uid, odooConfig.apiKey,
-      "product.pricelist",
+      "product.product",
       "read",
-      [plIds],
-      { fields: ["name"] },
-    ]) : [];
-
-    const plMap = new Map(pricelists.map((p: any) => [p.id, p.name]));
+      [[pid]],
+      { fields: ["lst_price"] },
+      { context: { pricelist: userPricelistId } },
+    ]) : null;
 
     return {
       sku: prod.default_code,
       name: prod.name,
-      list_price: prod.list_price,
-      standard_price: prod.standard_price,
-      pricelist_items: pricelistItems.map((i: any) => ({
-        pricelist: plMap.get(i.pricelist_id?.[0]) || i.pricelist_id,
+      user_pricelist_id: userPricelistId || null,
+      base_list_price: price?.[0]?.lst_price,
+      pricelist_items: items.map((i: any) => ({
+        name: i.name,
         fixed_price: i.fixed_price,
         min_quantity: i.min_quantity,
-        name: i.name,
+        pricelist_id: i.pricelist_id?.[0],
       })),
     };
   } catch (e: any) {
