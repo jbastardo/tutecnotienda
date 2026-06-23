@@ -41,22 +41,44 @@ export default function ProductosPage() {
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    fetch("/api/productos?synced=true&limit=50&page=1")
-      .then(r => r.json()).then(d => { setProducts(Array.isArray(d) ? d : []); setLoading(false); setHasMore(d.length === 50); });
+    fetchProducts();
     fetch("/api/proveedores").then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : []));
     fetch("/api/tasas").then(r => r.json()).then(d => { if (d.bcv > 0) setRates(d); }).catch(() => {});
   }, []);
 
+  const fetchProducts = async () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (minProfit) params.set("minProfit", minProfit);
+    if (statusFilter !== "all") params.set("pubStatus", statusFilter);
+    params.set("limit", "100");
+    params.set("page", "1");
+    const res = await fetch(`/api/productos?${params}`);
+    const data = await res.json();
+    setProducts(Array.isArray(data) ? data : []);
+    setHasMore(data.length === 100);
+    setPage(1);
+    setLoading(false);
+  };
+
   const loadMore = async () => {
     const next = page + 1;
     setPage(next);
-    const res = await fetch(`/api/productos?synced=true&limit=50&page=${next}`);
+    const params = new URLSearchParams();
+    if (minProfit) params.set("minProfit", minProfit);
+    if (statusFilter !== "all") params.set("pubStatus", statusFilter);
+    params.set("limit", "100");
+    params.set("page", String(next));
+    const res = await fetch(`/api/productos?${params}`);
     const data = await res.json();
     if (Array.isArray(data)) {
       setProducts(prev => [...prev, ...data]);
-      setHasMore(data.length === 50);
+      setHasMore(data.length === 100);
     }
   };
+
+  // Refetch when filters change
+  useEffect(() => { fetchProducts(); }, [minProfit, statusFilter]);
 
   const syncToSellibri = async (id: string) => {
     setSyncing(id);
@@ -109,9 +131,6 @@ export default function ProductosPage() {
     if (minPrice && Number(p.sellPrice) < Number(minPrice)) return false;
     if (maxPrice && Number(p.sellPrice) > Number(maxPrice)) return false;
     if (inStockOnly && Number(p.cost) <= 0) return false;
-    if (minProfit && Number(p.profit) < Number(minProfit)) return false;
-    if (statusFilter === "pub" && !p.synced) return false;
-    if (statusFilter === "pend" && p.synced) return false;
     return true;
   });
 

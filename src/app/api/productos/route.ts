@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   const notInList = searchParams.get("notInList");
   const limit = parseInt(searchParams.get("limit") || "0");
   const page = parseInt(searchParams.get("page") || "1");
+  const minProfit = parseFloat(searchParams.get("minProfit") || "0");
+  const pubStatus = searchParams.get("pubStatus");
 
   const where: Record<string, unknown> = {};
 
@@ -23,8 +25,11 @@ export async function GET(request: Request) {
     where.NOT = { sku: { in: skus } };
     where.synced = true;
   }
+  if (minProfit > 0) where.profit = { gte: minProfit };
+  if (pubStatus === "pub") where.synced = true;
+  if (pubStatus === "pend") where.synced = false;
 
-  const take = limit > 0 ? limit : 50;
+  const take = limit > 0 ? limit : 100;
   const skip = limit > 0 ? 0 : (page - 1) * 50;
 
   const products = await prisma.product.findMany({
