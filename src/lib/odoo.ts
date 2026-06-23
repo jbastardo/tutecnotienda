@@ -108,3 +108,40 @@ export async function fetchProducts(): Promise<OdooProduct[]> {
     qty_available: p.qty_available || 0,
   }));
 }
+
+export async function getProductPrices(sku: string): Promise<any> {
+  try {
+    const uid = await authenticate();
+    const models = createClient("/xmlrpc/2/object");
+
+    // Find product by SKU
+    const ids = await call(models, "execute_kw", [
+      odooConfig.db, uid, odooConfig.apiKey,
+      "product.product",
+      "search",
+      [[["default_code", "=", sku]]],
+    ]);
+
+    if (!ids || ids.length === 0) return { error: "SKU no encontrado" };
+
+    // Read product with all price fields
+    const products = await call(models, "execute_kw", [
+      odooConfig.db, uid, odooConfig.apiKey,
+      "product.product",
+      "read",
+      [ids],
+      { fields: ["name", "default_code", "list_price", "lst_price", "standard_price", "qty_available"] },
+    ]);
+
+    const p = products[0];
+    return {
+      sku: p.default_code,
+      name: p.name,
+      list_price: p.list_price || p.lst_price,
+      standard_price: p.standard_price,
+      qty_available: p.qty_available,
+    };
+  } catch (e: any) {
+    return { error: e.message || "Error" };
+  }
+}
