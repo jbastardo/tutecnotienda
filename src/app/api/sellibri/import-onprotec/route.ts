@@ -30,11 +30,16 @@ export async function POST(request: Request) {
 
   for (const sp of result.products) {
     try {
-      // Use Odoo pricelist price (Precio 4) if available, otherwise use variant cost
       const odooCost = sp.sku ? odooPriceMap.get(sp.sku) : undefined;
       const effectiveCost = odooCost || Number(sp.cost) || 0;
       const sellPrice = effectiveCost * 1.40;
       const profit = sellPrice - effectiveCost;
+
+      // Skip if profit too low
+      if (profit <= 100) {
+        skipped++;
+        continue;
+      }
 
       const existing = await prisma.product.findFirst({
         where: {
@@ -46,72 +51,55 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        // Only update if price changed
         if (Math.abs(Number(existing.cost) - effectiveCost) > 0.01) {
           await prisma.product.update({
             where: { id: existing.id },
-            data: {
-              name: sp.title,
-              cost: effectiveCost,
-              sellPrice,
-              profit,
-              margin: 0.40,
-              images: sp.images.length > 0 ? sp.images : existing.images,
-            },
+            data: { name: sp.title, cost: effectiveCost, sellPrice, profit, margin: 0.40, images: sp.images.length > 0 ? sp.images : existing.images },
           });
           updated++;
-        } else {
-          skipped++;
-        }
+        } else { skipped++; }
         continue;
       }
 
-      await prisma.product.create({
+      const product = await prisma.product.create({
         data: {
-          name: sp.title,
-          description: sp.description || null,
-          sku: sp.sku || null,
-          cost: effectiveCost,
-          sellPrice,
-          profit,
-          margin: 0.40,
+          name: sp.title, description: sp.description || null, sku: sp.sku || null,
+          cost: effectiveCost, sellPrice, profit, margin: 0.40,
           supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
           sellibriUrl: `https://onprotec.com/p/${sp.slug || sp.sellibriId}`,
-          synced: false,
-          status: "draft",
-          images: sp.images,
+          synced: false, status: "draft", images: sp.images,
         },
       });
       imported++;
 
-      // Auto-sync to tutecnotienda.com if profit > 100
-      if (profit > 100 && sp.sku) {
+      // Auto-sync to tutecnotienda.com
+      if (sp.sku) {
         try {
-          await fetch(`${process.env.SELLIBRI_API_URL || "https://tutecnotienda.com/api/v1"}/products`, {
+          const syncRes = await fetch(`${process.env.SELLIBRI_API_URL || "https://tutecnotienda.com/api/v1"}/products`, {
             method: "POST",
-            headers: {
-              "X-Api-Key": process.env.SELLIBRI_API_KEY || "",
-              "Content-Type": "application/json",
-            },
+            headers: { "X-Api-Key": process.env.SELLIBRI_API_KEY || "", "Content-Type": "application/json" },
             body: JSON.stringify({
               product: {
                 title: sp.title,
                 sku: sp.sku,
                 status: "active",
-                master_attributes: {
-                  price: String(sellPrice.toFixed(2)),
-                  cost: String(effectiveCost.toFixed(2)),
-                  sku: sp.sku,
-                },
+                master_attributes: { price: String(sellPrice.toFixed(2)), cost: String(effectiveCost.toFixed(2)), sku: sp.sku },
               },
             }),
           });
-        } catch {}
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            await prisma.product.update({
+              where: { id: product.id },
+              data: { synced: true, sellibriId: String(syncData.product?.id || sp.sellibriId), status: "published" },
+            });
+          } else {
+            console.error("[Onprotec] Error sync:", await syncRes.text().catch(() => ""));
+          }
+        } catch (e) { console.error("[Onprotec] Sync error:", e); }
       }
-    } catch (e) {
-      skipped++;
-    }
+    } catch (e) { skipped++; }
   }
 
   return NextResponse.json({
