@@ -1,36 +1,30 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts, isConfigured, getStoreDomain, generateSlug } from "@/lib/sellibri";
+import { fetchAllProducts, getStoreDomain, generateSlug } from "@/lib/sellibri";
+
+const ONPROTEC_CONFIG = {
+  apiKey: "2a7885a7768c6543517cfd74f0a32a8241a9ba72",
+  apiUrl: "https://onprotec.com/api/v1",
+  storeDomain: "onprotec.com",
+};
 
 export async function POST(request: Request) {
-  if (!isConfigured()) {
-    return NextResponse.json(
-      { error: "Sellibri no configurado" },
-      { status: 400 }
-    );
-  }
-
-  const storeDomain = getStoreDomain();
-
   const body = await request.json();
   const { supplierId } = body;
 
-  let imported = 0;
-  let skipped = 0;
-  let updated = 0;
-  let errors: string[] = [];
-
-  const result = await fetchAllProducts(undefined, (page, total) => {
-    console.log(`[Import] Pagina ${page}/${total}`);
+  const result = await fetchAllProducts(ONPROTEC_CONFIG, (page, total) => {
+    console.log(`[Onprotec] Pagina ${page}/${total}`);
   });
 
   if (result.error && result.products.length === 0) {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  const allProducts = result.products;
+  let imported = 0;
+  let updated = 0;
+  let skipped = 0;
 
-  for (const sp of allProducts) {
+  for (const sp of result.products) {
     try {
       const existing = await prisma.product.findFirst({
         where: {
@@ -42,7 +36,6 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        // Update existing product with latest data and images
         await prisma.product.update({
           where: { id: existing.id },
           data: {
@@ -52,15 +45,8 @@ export async function POST(request: Request) {
             profit: sp.price - sp.cost,
             margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
             images: sp.images.length > 0 ? sp.images : existing.images,
-            sellibriUrl: `https://${storeDomain}/p/${generateSlug(sp.title)}`,
           },
         });
-        if (supplierId && !existing.supplierId) {
-          await prisma.product.update({
-            where: { id: existing.id },
-            data: { supplierId },
-          });
-        }
         updated++;
         continue;
       }
@@ -76,24 +62,22 @@ export async function POST(request: Request) {
           margin: sp.price > 0 ? (sp.price - sp.cost) / sp.price : 0,
           supplierId: supplierId || null,
           sellibriId: String(sp.sellibriId),
-          sellibriUrl: `https://${storeDomain}/p/${generateSlug(sp.title)}`,
+          sellibriUrl: `https://onprotec.com/p/${sp.slug || sp.sellibriId}`,
           synced: true,
           status: "published",
           images: sp.images,
         },
       });
-
       imported++;
     } catch (e) {
-      errors.push(`Error con ${sp.title}: ${e}`);
+      skipped++;
     }
   }
 
   return NextResponse.json({
-    total: allProducts.length,
+    total: result.products.length,
     imported,
     updated,
     skipped,
-    errors: errors.slice(0, 10),
   });
 }

@@ -316,16 +316,21 @@ async function findWorkingUrl(): Promise<string | null> {
 }
 
 export async function fetchAllProducts(
+  customConfig?: Partial<SellibriConfig>,
   onProgress?: (page: number, total: number) => void
 ): Promise<{ products: ImportedProduct[]; error?: string }> {
-  if (!isConfigured()) {
-    return { products: [], error: "Sellibri no configurado. Revisa SELLIBRI_API_KEY y SELLIBRI_STORE_DOMAIN" };
+  const cfg = customConfig ? { ...config, ...customConfig } : config;
+  
+  if (!cfg.apiKey) {
+    return { products: [], error: "API key no configurada" };
   }
 
-  const baseUrl = await findWorkingUrl();
-  if (!baseUrl) {
-    return { products: [], error: "No se pudo conectar a la API de Sellibri. Verifica el dominio y API key." };
-  }
+  const baseUrl = cfg.apiUrl ? cfg.apiUrl.replace(/\/+$/, "") : getBaseUrl();
+  
+  const headersFn = customConfig ? () => ({
+    "X-Api-Key": cfg.apiKey,
+    "Content-Type": "application/json",
+  }) : headers;
 
   console.log(`[Sellibri] Usando API: ${baseUrl}`);
   const allProducts: ImportedProduct[] = [];
@@ -340,7 +345,7 @@ export async function fetchAllProducts(
 
       let res: Response;
       try {
-        res = await fetch(url, { headers: headers() });
+        res = await fetch(url, { headers: headersFn() });
       } catch (e) {
         return { products: [], error: `Error de conexion: ${e}. URL: ${url}` };
       }
