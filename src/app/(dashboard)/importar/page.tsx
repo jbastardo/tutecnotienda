@@ -75,8 +75,10 @@ export default function ImportarPage() {
     });
     const data = await res.json();
     if (!res.ok) { setMessage(data.error || "Error"); setCreating(false); return; }
+
+    const allProducts = [...(data.created || []), ...(data.updated || [])];
     let synced = 0;
-    for (const product of data) {
+    for (const product of allProducts) {
       const plp = priceList?.products.find(p => p.name === product.name);
       try {
         const sr = await fetch("/api/sellibri/sync", {
@@ -88,7 +90,7 @@ export default function ImportarPage() {
       } catch {}
       await new Promise(r => setTimeout(r, 300));
     }
-    setMessage(`${data.length} creados, ${synced} sincronizados`);
+    setMessage(`${data.created?.length || 0} nuevos, ${data.updated?.length || 0} actualizados, ${data.skipped || 0} sin cambios, ${synced} sincronizados`);
     setPriceList(null); setFile(null);
     setCreating(false);
   };

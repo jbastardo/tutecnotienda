@@ -90,11 +90,12 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        // Always update brand, cost, stock, images on existing products
         const costChanged = Math.abs(Number(existing.cost) - effectiveCost) > 0.01;
         const stockChanged = (existing.stock ?? 0) !== odooStock;
         const brandChanged = brand && existing.brand !== brand;
-        const needsUpdate = costChanged || stockChanged || brandChanged;
+        const nameChanged = sp.title !== existing.name;
+        const imagesChanged = sp.images.length > 0 && JSON.stringify(sp.images) !== JSON.stringify(existing.images);
+        const needsUpdate = costChanged || stockChanged || brandChanged || nameChanged || imagesChanged;
 
         if (needsUpdate) {
           await prisma.product.update({

@@ -64,7 +64,47 @@ export async function POST(request: Request) {
   }
 
   const created = [];
+  const updated = [];
+  const skipped = [];
+
   for (const plp of priceListProducts) {
+    // Check if product already exists by SKU
+    const existing = plp.sku
+      ? await prisma.product.findFirst({ where: { sku: plp.sku } })
+      : null;
+
+    if (existing) {
+      // Compare fields - update only if something changed
+      const costChanged = Math.abs(Number(existing.cost) - Number(plp.cost)) > 0.01;
+      const priceChanged = Math.abs(Number(existing.sellPrice) - Number(plp.sellPrice)) > 0.01;
+      const stockChanged = (existing.stock ?? 0) !== (plp.available || 0);
+      const brandChanged = (plp.brand || null) !== existing.brand;
+      const nameChanged = plp.name !== existing.name;
+
+      if (costChanged || priceChanged || stockChanged || brandChanged || nameChanged) {
+        const product = await prisma.product.update({
+          where: { id: existing.id },
+          data: {
+            name: plp.name,
+            description: plp.description || existing.description,
+            cost: plp.cost,
+            sellPrice: plp.sellPrice,
+            profit: plp.profit,
+            margin: plp.margin,
+            brand: plp.brand || existing.brand,
+            category: plp.category || existing.category,
+            stock: plp.available || 0,
+            images: plp.imageUrl ? [plp.imageUrl] : existing.images,
+          },
+        });
+        updated.push(product);
+      } else {
+        skipped.push(existing);
+      }
+      continue;
+    }
+
+    // Create new product
     const product = await prisma.product.create({
       data: {
         name: plp.name,
@@ -80,20 +120,20 @@ export async function POST(request: Request) {
         supplierId: plp.priceList.supplierId,
         status: "draft",
         images: plp.imageUrl ? [plp.imageUrl] : [],
-        supplierProducts: {
+        supplierProducts: plp.sku ? {
           create: {
             supplierId: plp.priceList.supplierId,
             cost: plp.cost,
             profit: plp.profit,
-            supplierSku: plp.sku || null,
+            supplierSku: plp.sku,
           },
-        },
+        } : undefined,
       },
     });
     created.push(product);
   }
 
-  return NextResponse.json(created, { status: 201 });
+  return NextResponse.json({ created, updated, skipped: skipped.length }, { status: 201 });
 }
 
 export async function DELETE(request: Request) {

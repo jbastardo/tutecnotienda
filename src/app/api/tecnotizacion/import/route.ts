@@ -15,6 +15,7 @@ export async function POST() {
 
   let imported = 0;
   let synced = 0;
+  let updated = 0;
   let skipped = 0;
 
   for (const tp of products) {
@@ -26,7 +27,28 @@ export async function POST() {
       : null;
 
     if (existingLocal) {
-      skipped++;
+      // Update if something changed
+      const cost = tp.costUsd || 0;
+      const sellPrice = cost / 0.55;
+      const costChanged = Math.abs(Number(existingLocal.cost) - cost) > 0.01;
+      const nameChanged = tp.name !== existingLocal.name;
+
+      if (costChanged || nameChanged) {
+        await prisma.product.update({
+          where: { id: existingLocal.id },
+          data: {
+            name: tp.name,
+            description: tp.description || existingLocal.description,
+            cost: cost,
+            sellPrice: sellPrice,
+            profit: sellPrice - cost,
+            images: tp.imageUrl ? [tp.imageUrl] : existingLocal.images,
+          },
+        });
+        updated++;
+      } else {
+        skipped++;
+      }
       continue;
     }
 
@@ -79,6 +101,7 @@ export async function POST() {
   return NextResponse.json({
     total: products.length,
     imported,
+    updated,
     synced,
     skipped,
   });
