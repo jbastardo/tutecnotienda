@@ -240,6 +240,55 @@ export async function createProduct(
   }
 }
 
+export async function updateProductOnSellibri(
+  sellibriId: string,
+  updates: {
+    title?: string;
+    description?: string;
+    vendorName?: string;
+    tags?: string[];
+    images?: string[];
+  }
+): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  const baseUrl = getBaseUrl();
+
+  const productData: Record<string, unknown> = {};
+  if (updates.title !== undefined) productData.title = updates.title;
+  if (updates.description !== undefined) productData.description = updates.description;
+  if (updates.vendorName !== undefined) productData.vendor_name = updates.vendorName;
+  if (updates.tags !== undefined) productData.tag_names = updates.tags;
+
+  if (updates.images !== undefined) {
+    productData.images_attributes = updates.images.map((url, idx) => ({
+      remote_url: url,
+      position: idx + 1,
+      alt: updates.title || "",
+    }));
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/products/${sellibriId}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ product: productData }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error(`[Sellibri] Error actualizando producto ${sellibriId}: ${res.status} ${errText.slice(0, 300)}`);
+      return false;
+    }
+
+    console.log(`[Sellibri] Producto ${sellibriId} actualizado`);
+    return true;
+  } catch (e) {
+    console.error("[Sellibri] Error actualizando producto:", e);
+    return false;
+  }
+}
+
 export async function updateProductVariant(
   variantId: number,
   updates: {

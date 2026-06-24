@@ -31,11 +31,22 @@ export async function testConnection(): Promise<{ ok: boolean; error?: string }>
 }
 
 export async function fetchProducts(): Promise<any[]> {
-  const res = await fetch(`${config.apiUrl}/api/products`, {
-    headers: headers(),
-  });
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const res = await fetch(`${config.apiUrl}/api/products`, {
+      headers: headers(),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error(`[Tecnotizacion] Error fetching products: ${res.status} ${errText.slice(0, 200)}`);
+      return [];
+    }
+    const data = await res.json();
+    console.log(`[Tecnotizacion] Productos obtenidos: ${Array.isArray(data) ? data.length : "no es array"}`);
+    return Array.isArray(data) ? data : [];
+  } catch (e: any) {
+    console.error(`[Tecnotizacion] Error de conexion:`, e.message || e);
+    return [];
+  }
 }
 
 export async function sendProduct(product: {

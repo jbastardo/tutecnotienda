@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProductVariant, searchProductBySku, searchProductImages, isConfigured, getStoreDomain } from "@/lib/sellibri";
+import { createProduct, updateProductVariant, updateProductOnSellibri, searchProductBySku, searchProductImages, isConfigured, getStoreDomain } from "@/lib/sellibri";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -30,8 +30,19 @@ export async function POST(request: Request) {
 
   const stockToUpdate = available ?? 0;
 
-  // If already synced, update the existing product
+  // If already synced, update the existing product on Sellibri
   if (product.synced && product.sellibriId) {
+    // Update product details (title, description, vendor, images)
+    const productImages = product.images && product.images.length > 0 ? product.images : undefined;
+    await updateProductOnSellibri(product.sellibriId, {
+      title: product.name,
+      description: product.description || undefined,
+      vendorName: product.brand || product.supplier?.name || undefined,
+      tags: product.brand ? [product.brand.toLowerCase(), "tutecnotienda"] : (product.supplier?.name ? [product.supplier.name.toLowerCase(), "tutecnotienda"] : ["tutecnotienda"]),
+      images: productImages,
+    });
+
+    // Update variant price/cost/stock
     if (product.sku) {
       const existingVariant = await searchProductBySku(product.sku);
       if (existingVariant) {
@@ -40,10 +51,10 @@ export async function POST(request: Request) {
           cost: Number(product.cost),
           available: stockToUpdate,
         });
-        return NextResponse.json({ success: true, action: "updated_existing", variantId: existingVariant.id });
       }
     }
-    return NextResponse.json({ success: true, action: "already_synced" });
+
+    return NextResponse.json({ success: true, action: "updated_existing", sellibriId: product.sellibriId });
   }
 
   // Check if SKU already exists in Sellibri

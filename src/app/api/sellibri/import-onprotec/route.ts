@@ -90,12 +90,20 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
-        // Update if cost or stock changed
-        const needsUpdate = Math.abs(Number(existing.cost) - effectiveCost) > 0.01 || (existing.stock ?? 0) !== odooStock;
+        // Always update brand, cost, stock, images on existing products
+        const costChanged = Math.abs(Number(existing.cost) - effectiveCost) > 0.01;
+        const stockChanged = (existing.stock ?? 0) !== odooStock;
+        const brandChanged = brand && existing.brand !== brand;
+        const needsUpdate = costChanged || stockChanged || brandChanged;
+
         if (needsUpdate) {
           await prisma.product.update({
             where: { id: existing.id },
-            data: { name: sp.title, cost: effectiveCost, sellPrice, profit, margin: marginPct, stock: odooStock, brand, images: sp.images.length > 0 ? sp.images : existing.images },
+            data: {
+              name: sp.title, cost: effectiveCost, sellPrice, profit, margin: marginPct,
+              stock: odooStock, brand: brand || existing.brand,
+              images: sp.images.length > 0 ? sp.images : existing.images,
+            },
           });
           updated++;
         }
