@@ -47,7 +47,6 @@ export async function POST(request: Request) {
       include: {
         products: {
           orderBy: { profit: "desc" },
-          take: 200,
         },
       },
     });
