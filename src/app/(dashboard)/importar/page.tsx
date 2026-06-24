@@ -98,7 +98,7 @@ export default function ImportarPage() {
         return;
       }
 
-      const allProducts = [...(data.created || []), ...(data.updated || [])];
+      const allProducts = [...(data.created || []), ...(data.updated || [])].filter(p => p && p.id && p.name);
       const totalToSync = allProducts.length;
 
       // Step 2: Sync to Sellibri in parallel batches of 5
@@ -108,8 +108,8 @@ export default function ImportarPage() {
       for (let i = 0; i < allProducts.length; i += batchSize) {
         const batch = allProducts.slice(i, i + batchSize);
         setProgressDetail(`Sincronizando ${Math.min(i + batchSize, totalToSync)}/${totalToSync} a la web...`);
-        const results = await Promise.all(batch.map(async (product: { id: string; name: string }) => {
-          const plp = priceList?.products.find(p => p.name === product.name);
+        const results = await Promise.all(batch.map(async (product) => {
+          const plp = priceList?.products?.find(p => p.name === product.name);
           try {
             const sr = await fetch("/api/sellibri/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
