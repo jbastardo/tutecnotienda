@@ -133,6 +133,42 @@ export async function POST(request: Request) {
     created.push(product);
   }
 
+  // Dar de baja: productos del mismo proveedor que NO estan en la nueva lista
+  const supplierId = priceListProducts[0]?.priceList.supplierId;
+  if (supplierId) {
+    // Get ALL SKUs from the entire price list (not just selected)
+    const allPriceListSkus = await prisma.priceListProduct.findMany({
+      where: { priceListId: priceListProducts[0].priceListId },
+      select: { sku: true },
+    });
+    const skuSet = new Set(allPriceListSkus.map(p => p.sku).filter((s): s is string => !!s));
+
+    if (skuSet.size > 0) {
+      // Find products from this supplier that are NOT in the new price list
+      const discontinued = await prisma.product.findMany({
+        where: {
+          supplierId,
+          sku: { not: null, notIn: Array.from(skuSet) },
+          stock: { gt: 0 },
+        },
+        select: { id: true, sku: true, name: true },
+      });
+
+      if (discontinued.length > 0) {
+        await prisma.product.updateMany({
+          where: { id: { in: discontinued.map(p => p.id) } },
+          data: { stock: 0 },
+        });
+        console.log(`[Productos] ${discontinued.length} productos dados de baja (sin inventario en nueva lista)`);
+      }
+
+      return NextResponse.json({
+        created, updated, skipped: skipped.length,
+        discontinued: discontinued.length,
+      }, { status: 201 });
+    }
+  }
+
   return NextResponse.json({ created, updated, skipped: skipped.length }, { status: 201 });
 }
 

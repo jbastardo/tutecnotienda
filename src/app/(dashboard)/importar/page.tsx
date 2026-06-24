@@ -178,7 +178,7 @@ export default function ImportarPage() {
                 const data = await res.json();
                 setProgressMsg("");
                 if (res.ok) {
-                  alert(`Importados: ${data.imported} nuevos, ${data.updated} actualizados, ${data.synced} sincronizados a la web${data.syncErrors > 0 ? `, ${data.syncErrors} errores` : ""}`);
+                  alert(`Importados: ${data.imported} nuevos, ${data.updated} actualizados, ${data.synced} sincronizados${data.discontinued > 0 ? `, ${data.discontinued} dados de baja (sin stock)` : ""}${data.syncErrors > 0 ? `, ${data.syncErrors} errores` : ""}`);
                 } else { alert(data.error); }
               }} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-50 flex items-center justify-center gap-2">

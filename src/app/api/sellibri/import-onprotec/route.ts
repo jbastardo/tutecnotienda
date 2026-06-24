@@ -57,9 +57,11 @@ export async function POST(request: Request) {
   let skipped = 0;
   let skippedNoProfit = 0;
   let skippedExisting = 0;
+  const processedSkus = new Set<string>();
 
   for (const sp of result.products) {
     try {
+      if (sp.sku) processedSkus.add(sp.sku);
       const odooCost = sp.sku ? odooPriceMap.get(sp.sku) : undefined;
       const odooStock = sp.sku ? (odooStockMap.get(sp.sku) || 0) : 0;
       const effectiveCost = odooCost || Number(sp.cost) || 0;
@@ -156,9 +158,31 @@ export async function POST(request: Request) {
 
   console.log(`[Onprotec] RESULTADO: total=${result.products.length} importado=${imported} actualizado=${updated} sincronizado=${synced} errSync=${syncErrors} saltado=${skipped}`);
 
+  // Dar de baja: productos Onprotec que ya no aparecen en la importacion
+  let discontinued = 0;
+  if (processedSkus.size > 0) {
+    const outOfStock = await prisma.product.findMany({
+      where: {
+        supplierId: effectiveSupplierId,
+        sku: { not: null, notIn: Array.from(processedSkus) },
+        stock: { gt: 0 },
+      },
+      select: { id: true, sku: true, name: true },
+    });
+
+    if (outOfStock.length > 0) {
+      await prisma.product.updateMany({
+        where: { id: { in: outOfStock.map(p => p.id) } },
+        data: { stock: 0 },
+      });
+      discontinued = outOfStock.length;
+      console.log(`[Onprotec] ${discontinued} productos dados de baja (sin inventario)`);
+    }
+  }
+
   return NextResponse.json({
     total: result.products.length, imported, updated, synced, syncErrors, skipped,
-    skippedNoProfit, skippedExisting,
+    skippedNoProfit, skippedExisting, discontinued,
   });
 }
 
