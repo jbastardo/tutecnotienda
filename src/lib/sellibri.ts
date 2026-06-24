@@ -335,28 +335,37 @@ export async function updateProductVariant(
 export async function searchProductImages(
   query: string
 ): Promise<string[]> {
-  // Usamos Google Custom Search o Unsplash para buscar imagenes
-  // Por ahora retornamos vacio - se implementara segun disponibilidad
-  console.log(`[Sellibri] Buscando imagenes para: ${query}`);
+  console.log(`[Sellibri] Buscando imagenes en MercadoLibre Venezuela: ${query}`);
 
-  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
-  if (unsplashKey) {
-    try {
-      const res = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-          query
-        )}&per_page=3&client_id=${unsplashKey}`
-      );
-      const data = await res.json();
-      return (data.results || []).map(
-        (r: { urls: { regular: string } }) => r.urls.regular
-      );
-    } catch {
-      // fallback
+  try {
+    const res = await fetch(
+      `https://api.mercadolibre.com/sites/MLV/search?q=${encodeURIComponent(query)}&limit=5`,
+      { headers: { "Accept": "application/json" } }
+    );
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const results = data.results || [];
+
+    // Get high-quality images (white background preferred)
+    const images: string[] = [];
+    for (const item of results) {
+      if (item.thumbnail) {
+        // MercadoLibre thumbnails: replace http with https and get larger size
+        const imgUrl = item.thumbnail
+          .replace(/^http:\/\//, "https://")
+          .replace(/-[A-Z]\.(jpg|png|webp)$/, "-F.$1");
+        if (!images.includes(imgUrl)) images.push(imgUrl);
+      }
+      if (images.length >= 3) break;
     }
-  }
 
-  return [];
+    return images;
+  } catch (e) {
+    console.error("[Sellibri] Error buscando imagenes en MercadoLibre:", e);
+    return [];
+  }
 }
 
 export async function searchOrGenerateDescription(

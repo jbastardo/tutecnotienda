@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllProducts, fetchTaxons, createProduct, isConfigured } from "@/lib/sellibri";
+import { fetchAllProducts, fetchTaxons, createProduct, updateProductOnSellibri, searchProductBySku, updateProductVariant, isConfigured, getStoreDomain } from "@/lib/sellibri";
 import { fetchPricelistPrices, fetchOdooBrands, fetchOdooCategories, fetchOdooStock } from "@/lib/odoo";
 
 const ONPROTEC_CONFIG = {
@@ -14,12 +14,11 @@ export async function POST(request: Request) {
   const { supplierId, margin = "40", syncOnly = false } = body;
   const marginPct = Number(margin) / 100;
 
-  // Mode 2: Only sync existing unsynced products (skip Odoo fetch)
   if (syncOnly) {
-    return await syncUnsynced(marginPct);
+    return await syncUnsynced();
   }
 
-  // Mode 1: Full import from Onprotec
+  // Get or create Onprotec supplier
   let effectiveSupplierId = supplierId;
   if (!effectiveSupplierId) {
     let supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
@@ -31,18 +30,17 @@ export async function POST(request: Request) {
     effectiveSupplierId = supplier.id;
   }
 
-  console.log("[Onprotec] Sellibri configurado:", isConfigured());
-  console.log("[Onprotec] Cargando datos de Odoo...");
+  console.log("[Onprotec] Iniciando import. Sellibri configurado:", isConfigured());
+  console.log("[Onprotec] Supplier ID:", effectiveSupplierId);
+
   const odooPriceMap = await fetchPricelistPrices("Precio 4");
-  console.log(`[Onprotec] Precio 4: ${odooPriceMap.size} SKUs con precio`);
+  console.log(`[Onprotec] Precio 4: ${odooPriceMap.size} SKUs`);
   const odooStockMap = await fetchOdooStock();
-  console.log(`[Onprotec] Stock Odoo: ${odooStockMap.size} SKUs con stock`);
+  console.log(`[Onprotec] Stock: ${odooStockMap.size} SKUs`);
   const odooBrandMap = await fetchOdooBrands();
-  console.log(`[Onprotec] Marcas Odoo: ${odooBrandMap.size} SKUs`);
+  console.log(`[Onprotec] Marcas: ${odooBrandMap.size} SKUs`);
   const odooCatMap = await fetchOdooCategories();
-  console.log(`[Onprotec] Categorias Odoo: ${odooCatMap.size} SKUs`);
   const taxonMap = await fetchTaxons();
-  console.log(`[Onprotec] Taxones Sellibri: ${taxonMap.size}`);
 
   const result = await fetchAllProducts(ONPROTEC_CONFIG, (page, total) => {
     console.log(`[Onprotec] Pagina ${page}/${total}`);
@@ -54,12 +52,11 @@ export async function POST(request: Request) {
 
   let imported = 0;
   let updated = 0;
-  let skipped = 0;
   let synced = 0;
   let syncErrors = 0;
+  let skipped = 0;
   let skippedNoProfit = 0;
   let skippedExisting = 0;
-  let sampleLogged = 0;
 
   for (const sp of result.products) {
     try {
@@ -70,32 +67,20 @@ export async function POST(request: Request) {
       const brand = sp.sku ? (odooBrandMap.get(sp.sku) || null) : null;
       const profit = sellPrice - effectiveCost;
 
-      if (profit < 60) {
-        skipped++;
-        skippedNoProfit++;
-        if (sampleLogged < 3) {
-          console.log(`[Onprotec] SKIP (profit) "${sp.title}" SKU=${sp.sku} cost=${effectiveCost} sell=${sellPrice.toFixed(2)} profit=${profit.toFixed(2)}`);
-          sampleLogged++;
-        }
-        continue;
-      }
-
-      const existing = await prisma.product.findFirst({
-        where: {
-          OR: [
-            { sellibriId: String(sp.sellibriId) },
-            ...(sp.sku ? [{ sku: sp.sku }] : []),
-          ],
-        },
-      });
+      // Find existing product by SKU or sellibriId
+      const existing = sp.sku
+        ? await prisma.product.findFirst({ where: { sku: sp.sku } })
+        : await prisma.product.findFirst({ where: { sellibriId: String(sp.sellibriId) } });
 
       if (existing) {
+        // Compare all fields
         const costChanged = Math.abs(Number(existing.cost) - effectiveCost) > 0.01;
         const stockChanged = (existing.stock ?? 0) !== odooStock;
         const brandChanged = brand && existing.brand !== brand;
         const nameChanged = sp.title !== existing.name;
         const imagesChanged = sp.images.length > 0 && JSON.stringify(sp.images) !== JSON.stringify(existing.images);
-        const needsUpdate = costChanged || stockChanged || brandChanged || nameChanged || imagesChanged;
+        const supplierChanged = existing.supplierId !== effectiveSupplierId;
+        const needsUpdate = costChanged || stockChanged || brandChanged || nameChanged || imagesChanged || supplierChanged;
 
         if (needsUpdate) {
           await prisma.product.update({
@@ -103,18 +88,35 @@ export async function POST(request: Request) {
             data: {
               name: sp.title, cost: effectiveCost, sellPrice, profit, margin: marginPct,
               stock: odooStock, brand: brand || existing.brand,
+              supplierId: effectiveSupplierId,
               images: sp.images.length > 0 ? sp.images : existing.images,
             },
           });
           updated++;
         }
 
-        // Sync to Sellibri if not yet synced
-        if (!existing.synced && sp.sku) {
-          const syncOk = await syncProductToSellibri(existing.id, {
-            title: sp.title, price: sellPrice, cost: effectiveCost, sku: sp.sku, images: sp.images, stock: odooStock,
-          });
-          if (syncOk) synced++; else syncErrors++;
+        // Sync to Sellibri if: not synced, OR data changed
+        if (sp.sku && (!existing.synced || needsUpdate)) {
+          if (existing.synced && existing.sellibriId) {
+            // Already on Sellibri - update product + variant
+            const productImages = sp.images.length > 0 ? sp.images : existing.images;
+            await updateProductOnSellibri(existing.sellibriId, {
+              title: sp.title,
+              vendorName: brand || undefined,
+              images: productImages,
+            });
+            const variant = await searchProductBySku(sp.sku);
+            if (variant) {
+              await updateProductVariant(variant.id, { price: sellPrice, cost: effectiveCost, available: odooStock });
+            }
+            synced++;
+          } else {
+            // Not on Sellibri - create
+            const ok = await syncProductToSellibri(existing.id, {
+              title: sp.title, price: sellPrice, cost: effectiveCost, sku: sp.sku, images: sp.images, stock: odooStock,
+            });
+            if (ok) synced++; else syncErrors++;
+          }
         } else if (!needsUpdate) {
           skipped++;
           skippedExisting++;
@@ -122,7 +124,13 @@ export async function POST(request: Request) {
         continue;
       }
 
-      // Create new product in local DB
+      // New product - only create if profit >= 60
+      if (profit < 60) {
+        skipped++;
+        skippedNoProfit++;
+        continue;
+      }
+
       const product = await prisma.product.create({
         data: {
           name: sp.title, description: sp.description || null, sku: sp.sku || null,
@@ -134,90 +142,68 @@ export async function POST(request: Request) {
       });
       imported++;
 
-      // Sync to Sellibri
       if (sp.sku) {
-        const syncOk = await syncProductToSellibri(product.id, {
+        const ok = await syncProductToSellibri(product.id, {
           title: sp.title, price: sellPrice, cost: effectiveCost, sku: sp.sku, images: sp.images, stock: odooStock,
         });
-        if (syncOk) synced++; else syncErrors++;
+        if (ok) synced++; else syncErrors++;
       }
     } catch (e: any) {
       skipped++;
-      console.error(`[Onprotec] Error procesando "${sp.title}":`, e.message || e);
+      console.error(`[Onprotec] Error: "${sp.title}":`, e.message || e);
     }
   }
 
-  console.log(`[Onprotec] RESULTADO: total=${result.products.length} importado=${imported} actualizado=${updated} saltado=${skipped} sincronizado=${synced} errSync=${syncErrors}`);
+  console.log(`[Onprotec] RESULTADO: total=${result.products.length} importado=${imported} actualizado=${updated} sincronizado=${synced} errSync=${syncErrors} saltado=${skipped}`);
 
   return NextResponse.json({
-    total: result.products.length,
-    imported,
-    updated,
-    skipped,
-    synced,
-    syncErrors,
-    skippedNoProfit,
-    skippedExisting,
+    total: result.products.length, imported, updated, synced, syncErrors, skipped,
+    skippedNoProfit, skippedExisting,
   });
 }
 
-// Sync unsynced Onprotec products (no Odoo fetch needed)
-async function syncUnsynced(marginPct: number) {
+async function syncUnsynced() {
   const unsynced = await prisma.product.findMany({
     where: { synced: false, supplier: { slug: "onprotec" }, sku: { not: null } },
-    include: { supplier: true },
     take: 500,
   });
-
-  console.log(`[Onprotec] Sync-only mode: ${unsynced.length} productos sin sincronizar`);
-  let synced = 0;
-  let errors = 0;
-
+  console.log(`[Onprotec] Sync-only: ${unsynced.length} pendientes`);
+  let synced = 0, errors = 0;
   for (const p of unsynced) {
     const ok = await syncProductToSellibri(p.id, {
       title: p.name, price: Number(p.sellPrice), cost: Number(p.cost), sku: p.sku!, images: p.images, stock: p.stock ?? 0,
     });
     if (ok) synced++; else errors++;
   }
-
   return NextResponse.json({ total: unsynced.length, synced, errors });
 }
 
-// Helper: sync a single product to Sellibri and update local DB
 async function syncProductToSellibri(
   productId: string,
   data: { title: string; price: number; cost: number; sku: string; images: string[]; stock: number }
 ): Promise<boolean> {
   try {
     const result = await createProduct({
-      title: data.title,
-      price: data.price,
-      cost: data.cost,
-      sku: data.sku,
-      status: "active",
-      tags: ["onprotec", "tutecnotienda"],
-      available: data.stock,
-      images: data.images.length > 0 ? data.images : undefined,
+      title: data.title, price: data.price, cost: data.cost, sku: data.sku,
+      status: "active", tags: ["onprotec", "tutecnotienda"],
+      available: data.stock, images: data.images.length > 0 ? data.images : undefined,
     });
-
     if (result?.id) {
       await prisma.product.update({
         where: { id: productId },
         data: {
-          synced: true,
-          sellibriId: String(result.id),
+          synced: true, sellibriId: String(result.id),
           sellibriUrl: `https://tutecnotienda.com/p/${result.slug || result.id}`,
           status: "published",
         },
       });
-      console.log(`[Onprotec] Synced: ${data.title} -> sellibriId=${result.id}`);
+      console.log(`[Onprotec] Synced: ${data.title} -> ${result.id}`);
       return true;
     }
-
-    console.error(`[Onprotec] createProduct returned null for "${data.title}" (SKU: ${data.sku})`);
+    console.error(`[Onprotec] createProduct null: "${data.title}"`);
     return false;
   } catch (e: any) {
-    console.error(`[Onprotec] Sync error for "${data.title}":`, e.message || e);
+    console.error(`[Onprotec] Sync error "${data.title}":`, e.message);
     return false;
   }
 }

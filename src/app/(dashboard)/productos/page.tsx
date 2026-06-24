@@ -57,14 +57,13 @@ export default function ProductosPage() {
     const res = await fetch(`/api/productos?${params}`);
     const data = await res.json();
     setProducts(Array.isArray(data) ? data : []);
-    setHasMore(data.length === 100);
+    setHasMore(Array.isArray(data) && data.length === 100);
     setPage(1);
     setLoading(false);
   };
 
   const loadMore = async () => {
     const next = page + 1;
-    setPage(next);
     const params = new URLSearchParams();
     if (minProfit) params.set("minProfit", minProfit);
     if (statusFilter !== "all") params.set("pubStatus", statusFilter);
@@ -72,9 +71,12 @@ export default function ProductosPage() {
     params.set("page", String(next));
     const res = await fetch(`/api/productos?${params}`);
     const data = await res.json();
-    if (Array.isArray(data)) {
+    if (Array.isArray(data) && data.length > 0) {
       setProducts(prev => [...prev, ...data]);
       setHasMore(data.length === 100);
+      setPage(next);
+    } else {
+      setHasMore(false);
     }
   };
 
