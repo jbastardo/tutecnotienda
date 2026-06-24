@@ -251,11 +251,20 @@ export default function ImportarPage() {
   };
 
   const runApiImport = async (label: string, url: string, body?: Record<string, unknown>) => {
-    if (!confirm(`${label}?`)) return;
+    if (!confirm(`${label}? Esto puede tomar varios minutos.`)) return;
     setProgressMsg(label);
     const start = Date.now();
     try {
-      const res = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined, credentials: "include" });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 600000); // 10 min timeout
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: "include",
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
       const text = await res.text();
       let data: any;
       try { data = JSON.parse(text); } catch { data = { error: text || `HTTP ${res.status} - respuesta vacia` }; }
@@ -272,7 +281,9 @@ export default function ImportarPage() {
         addLog({ operation: label, duration, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error || text || `HTTP ${res.status}` });
       }
     } catch (e: any) {
-      addLog({ operation: label, duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: e.message || "Error de conexion" });
+      const duration = Date.now() - start;
+      const errorMsg = e.name === "AbortError" ? "Timeout - la operacion tardo mas de 10 minutos" : (e.message || "Error de conexion");
+      addLog({ operation: label, duration, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg });
     }
     setProgressMsg("");
   };
