@@ -174,37 +174,50 @@ export async function fetchOdooBrands(): Promise<Map<string, string>> {
       "product.product",
       "search_read",
       [[["sale_ok", "=", true]]],
-      { fields: ["default_code", "brand_id"] },
+      { fields: ["default_code", "name", "brand_id"] },
     ]);
-
-    // Get brand names
-    const brandIds = [...new Set(allProducts.map((p: any) => p.brand_id?.[0]).filter(Boolean))];
-    if (brandIds.length === 0) {
-      console.log("[Odoo] No se encontraron brand_id en productos");
-      return new Map();
-    }
-
-    const brands = await call(models, "execute_kw", [
-      odooConfig.db, uid, odooConfig.apiKey,
-      "product.brand",
-      "read",
-      [brandIds],
-      { fields: ["name"] },
-    ]);
-
-    const brandMap = new Map<number, string>();
-    for (const b of brands) brandMap.set(b.id, b.name);
 
     const skuBrandMap = new Map<string, string>();
-    for (const p of allProducts) {
-      const sku = p.default_code;
-      const brandId = p.brand_id?.[0];
-      if (sku && brandId && brandMap.has(brandId)) {
-        skuBrandMap.set(sku, brandMap.get(brandId)!);
+
+    // First pass: try to get brand from brand_id
+    const brandIds = [...new Set(allProducts.map((p: any) => p.brand_id?.[0]).filter(Boolean))];
+    let brandMap = new Map<number, string>();
+    if (brandIds.length > 0) {
+      try {
+        const brands = await call(models, "execute_kw", [
+          odooConfig.db, uid, odooConfig.apiKey,
+          "product.brand",
+          "read",
+          [brandIds],
+          { fields: ["name"] },
+        ]);
+        for (const b of brands) brandMap.set(b.id, b.name);
+      } catch (e) {
+        console.log("[Odoo] Modelo product.brand no existe, extrayendo marca del nombre");
       }
     }
 
-    console.log(`[Odoo] Marcas mapeadas: ${skuBrandMap.size} SKUs`);
+    // Second pass: map SKU -> brand
+    for (const p of allProducts) {
+      const sku = p.default_code;
+      if (!sku) continue;
+
+      // Try brand_id first
+      const brandId = p.brand_id?.[0];
+      if (brandId && brandMap.has(brandId)) {
+        skuBrandMap.set(sku, brandMap.get(brandId)!);
+        continue;
+      }
+
+      // Fallback: extract brand from name pattern "[Brand] Product"
+      const name = p.name || "";
+      const match = name.match(/^\[([^\]]+)\]/);
+      if (match) {
+        skuBrandMap.set(sku, match[1].trim());
+      }
+    }
+
+    console.log(`[Odoo] Marcas mapeadas: ${skuBrandMap.size} SKUs (${brandIds.length} de brand_id, ${skuBrandMap.size - brandIds.length} del nombre)`);
     return skuBrandMap;
   } catch (e: any) {
     console.error("[Odoo] Error fetching brands:", e.message || e);
