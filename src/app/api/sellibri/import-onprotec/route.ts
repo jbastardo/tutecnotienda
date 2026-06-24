@@ -10,33 +10,34 @@ const ONPROTEC_CONFIG = {
 };
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { supplierId, margin, syncOnly = false } = body;
+  try {
+    const body = await request.json();
+    const { supplierId, margin, syncOnly = false } = body;
 
-  if (syncOnly) {
-    return await syncUnsynced();
-  }
-
-  // Get or create Onprotec supplier
-  let effectiveSupplierId = supplierId;
-  let supplier;
-  if (!effectiveSupplierId) {
-    supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
-    if (!supplier) {
-      supplier = await prisma.supplier.create({
-        data: { name: "Onprotec", slug: "onprotec", description: "Productos importados via API de onprotec.com", margin: 0.4 },
-      });
+    if (syncOnly) {
+      return await syncUnsynced();
     }
-    effectiveSupplierId = supplier.id;
-  } else {
-    supplier = await prisma.supplier.findUnique({ where: { id: effectiveSupplierId } });
-  }
 
-  // Use supplier's margin if not provided in request
-  const marginPct = margin !== undefined ? Number(margin) / 100 : Number(supplier?.margin || 0.4);
+    // Get or create Onprotec supplier
+    let effectiveSupplierId = supplierId;
+    let supplier;
+    if (!effectiveSupplierId) {
+      supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
+      if (!supplier) {
+        supplier = await prisma.supplier.create({
+          data: { name: "Onprotec", slug: "onprotec", description: "Productos importados via API de onprotec.com", margin: 0.4 },
+        });
+      }
+      effectiveSupplierId = supplier.id;
+    } else {
+      supplier = await prisma.supplier.findUnique({ where: { id: effectiveSupplierId } });
+    }
 
-  console.log("[Onprotec] Iniciando import. Sellibri configurado:", isConfigured());
-  console.log("[Onprotec] Supplier ID:", effectiveSupplierId);
+    // Use supplier's margin if not provided in request
+    const marginPct = margin !== undefined ? Number(margin) / 100 : Number(supplier?.margin || 0.4);
+
+    console.log("[Onprotec] Iniciando import. Sellibri configurado:", isConfigured());
+    console.log("[Onprotec] Supplier ID:", effectiveSupplierId, "Margen:", marginPct);
 
   const odooPriceMap = await fetchPricelistPrices("Precio 4");
   console.log(`[Onprotec] Precio 4: ${odooPriceMap.size} SKUs`);
@@ -189,6 +190,11 @@ export async function POST(request: Request) {
     total: result.products.length, imported, updated, synced, syncErrors, skipped,
     skippedNoProfit, skippedExisting, discontinued,
   });
+
+  } catch (e: any) {
+    console.error("[Onprotec] Error fatal:", e.message || e);
+    return NextResponse.json({ error: e.message || "Error desconocido en import Onprotec" }, { status: 500 });
+  }
 }
 
 async function syncUnsynced() {

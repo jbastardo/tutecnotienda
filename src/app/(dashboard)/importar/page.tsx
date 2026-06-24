@@ -22,7 +22,7 @@ interface PriceList {
 interface LogEntry {
   id: string; time: string; operation: string; duration: number;
   created: number; updated: number; synced: number; discontinued: number;
-  skipped: number; errors: number; success: boolean;
+  skipped: number; errors: number; success: boolean; errorMsg?: string;
 }
 
 export default function ImportarPage() {
@@ -170,13 +170,13 @@ export default function ImportarPage() {
           created: data.imported || 0, updated: data.updated || 0,
           synced: data.synced || 0, discontinued: data.discontinued || 0,
           skipped: data.skipped || 0, errors: data.syncErrors || data.errors || 0,
-          success: true,
+          success: true, errorMsg: data.error || undefined,
         });
       } else {
-        addLog({ operation: label, duration, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false });
+        addLog({ operation: label, duration, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error || `HTTP ${res.status}` });
       }
-    } catch {
-      addLog({ operation: label, duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false });
+    } catch (e: any) {
+      addLog({ operation: label, duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: e.message || "Error de conexion" });
     }
     setProgressMsg("");
   };
@@ -274,6 +274,7 @@ export default function ImportarPage() {
                   {log.discontinued > 0 && <span className="text-orange-600">{log.discontinued} dados de baja</span>}
                   {log.skipped > 0 && <span className="text-gray-400">{log.skipped} sin cambios</span>}
                   {log.errors > 0 && <span className="text-red-600">{log.errors} errores</span>}
+                  {log.errorMsg && <span className="text-red-500 block mt-1">{log.errorMsg}</span>}
                 </div>
               </div>
             ))}
@@ -396,6 +397,7 @@ export default function ImportarPage() {
                   {log.discontinued > 0 && <span className="text-orange-600">{log.discontinued} dados de baja</span>}
                   {log.skipped > 0 && <span className="text-gray-400">{log.skipped} sin cambios</span>}
                   {log.errors > 0 && <span className="text-red-600">{log.errors} errores</span>}
+                  {log.errorMsg && <span className="text-red-500 block mt-1">{log.errorMsg}</span>}
                 </div>
               </div>
             ))}
