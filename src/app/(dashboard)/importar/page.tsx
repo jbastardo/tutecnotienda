@@ -36,6 +36,7 @@ export default function ImportarPage() {
   const [creating, setCreating] = useState(false);
   const [margin, setMargin] = useState("40");
   const [progressMsg, setProgressMsg] = useState("");
+  const [progressDetail, setProgressDetail] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export default function ImportarPage() {
   const handleCreateProducts = async () => {
     if (selectedIds.size === 0) return;
     setCreating(true);
+    setProgressDetail("Creando productos en base de datos...");
     const start = Date.now();
 
     // Step 1: Create/update products in local DB
@@ -93,10 +95,12 @@ export default function ImportarPage() {
     if (!res.ok) {
       addLog({ operation: "Crear y publicar", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error });
       setCreating(false);
+      setProgressDetail("");
       return;
     }
 
     const allProducts = [...(data.created || []), ...(data.updated || [])];
+    const totalToSync = allProducts.length;
 
     // Step 2: Sync to Sellibri in parallel batches of 5
     let synced = 0;
@@ -104,6 +108,7 @@ export default function ImportarPage() {
     const batchSize = 5;
     for (let i = 0; i < allProducts.length; i += batchSize) {
       const batch = allProducts.slice(i, i + batchSize);
+      setProgressDetail(`Sincronizando ${Math.min(i + batchSize, totalToSync)}/${totalToSync} a la web...`);
       const results = await Promise.all(batch.map(async (product: { id: string; name: string }) => {
         const plp = priceList?.products.find(p => p.name === product.name);
         try {
@@ -132,6 +137,7 @@ export default function ImportarPage() {
     });
     setPriceList(null); setFile(null);
     setCreating(false);
+    setProgressDetail("");
   };
 
   const handleUpdateStock = async () => {
@@ -147,6 +153,7 @@ export default function ImportarPage() {
     const batchSize = 5;
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
+      setProgressDetail(`Procesando ${Math.min(i + batchSize, ids.length)}/${ids.length}...`);
       await Promise.all(batch.map(async (id) => {
         const plp = priceList?.products.find(p => p.id === id);
         if (!plp?.sku) return;
@@ -172,6 +179,7 @@ export default function ImportarPage() {
       created: 0, updated, synced: updated, discontinued: 0, skipped: ids.length - updated, errors: syncErrors, success: true,
     });
     setCreating(false);
+    setProgressDetail("");
   };
 
   const runApiImport = async (label: string, url: string, body?: Record<string, unknown>) => {
@@ -375,6 +383,11 @@ export default function ImportarPage() {
       <div className="mt-4 flex items-center justify-between rounded-xl border bg-white p-4">
         <span className="text-sm text-gray-500">{selectedIds.size} de {priceList.totalRows}</span>
         <div className="flex items-center gap-3">
+          {creating && progressDetail && (
+            <span className="text-sm text-blue-600 flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin"/> {progressDetail}
+            </span>
+          )}
           <button onClick={handleUpdateStock} disabled={selectedIds.size === 0 || creating}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
             <ArrowRight className="h-4 w-4"/>Actualizar precios y stock
