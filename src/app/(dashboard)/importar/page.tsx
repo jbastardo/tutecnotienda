@@ -80,6 +80,47 @@ export default function ImportarPage() {
     setUploading(false);
   };
 
+  const handleForceSync = async () => {
+    if (selectedIds.size === 0) return;
+    setCreating(true);
+    const start = Date.now();
+
+    try {
+      const ids = Array.from(selectedIds);
+      let synced = 0;
+      let errors = 0;
+      const batchSize = 5;
+
+      for (let i = 0; i < ids.length; i += batchSize) {
+        const batch = ids.slice(i, i + batchSize);
+        setProgressDetail(`Sincronizando ${Math.min(i + batchSize, ids.length)}/${ids.length} a la web...`);
+        const results = await Promise.all(batch.map(async (id) => {
+          try {
+            const sr = await fetch("/api/sellibri/sync", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ productId: id, available: 0 }),
+              credentials: "include",
+            });
+            return sr.ok;
+          } catch { return false; }
+        }));
+        synced += results.filter(Boolean).length;
+        errors += results.filter(r => !r).length;
+      }
+
+      addLog({
+        operation: "Sincronizar todo a la web",
+        duration: Date.now() - start,
+        created: 0, updated: 0, synced, discontinued: 0, skipped: ids.length - synced, errors, success: true,
+      });
+    } catch (e: any) {
+      addLog({ operation: "Sincronizar todo a la web", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: e.message || "Error desconocido" });
+    } finally {
+      setCreating(false);
+      setProgressDetail("");
+    }
+  };
+
   const handleCreateProducts = async () => {
     if (selectedIds.size === 0) return;
     setCreating(true);
@@ -153,7 +194,6 @@ export default function ImportarPage() {
   const handleUpdateStock = async () => {
     if (selectedIds.size === 0) return;
     setCreating(true);
-    setProgressDetail("Actualizando precios y stock...");
     const start = Date.now();
 
     try {
@@ -167,14 +207,14 @@ export default function ImportarPage() {
         const batch = ids.slice(i, i + batchSize);
         setProgressDetail(`Procesando ${Math.min(i + batchSize, ids.length)}/${ids.length}...`);
         await Promise.all(batch.map(async (id) => {
-          const plp = priceList?.products.find(p => p.id === id);
-          if (!plp?.sku) return;
           try {
+            const plp = priceList?.products?.find((p: any) => p && p.id === id);
+            if (!plp?.sku) return;
             const cr = await fetch(`/api/productos?sku=${encodeURIComponent(plp.sku)}`);
             const existing = await cr.json();
-            if (Array.isArray(existing) && existing.length > 0) {
+            if (Array.isArray(existing) && existing.length > 0 && existing[0]?.id) {
               await fetch("/api/productos", { method: "PUT", headers: {"Content-Type":"application/json"},
-                body: JSON.stringify({ id: existing[0].id, cost: Number(plp.cost), sellPrice: Number(plp.sellPrice), profit: Number(plp.profit) }) });
+                body: JSON.stringify({ id: existing[0].id, cost: Number(plp.cost || 0), sellPrice: Number(plp.sellPrice || 0), profit: Number(plp.profit || 0) }) });
               if (existing[0].synced) {
                 const sr = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"},
                   body: JSON.stringify({ productId: existing[0].id, available: plp.available || 0 }), credentials: "include" });
@@ -186,7 +226,7 @@ export default function ImportarPage() {
       }
 
       addLog({
-        operation: `Actualizar precios y stock (${priceList?.supplier.name || "?"})`,
+        operation: "Actualizar precios y stock",
         duration: Date.now() - start,
         created: 0, updated, synced: updated, discontinued: 0, skipped: ids.length - updated, errors: syncErrors, success: true,
       });
@@ -404,6 +444,10 @@ export default function ImportarPage() {
               <Loader2 className="h-4 w-4 animate-spin"/> {progressDetail}
             </span>
           )}
+          <button onClick={handleForceSync} disabled={selectedIds.size === 0 || creating}
+            className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+            <Upload className="h-4 w-4"/>Sincronizar todo a la web
+          </button>
           <button onClick={handleUpdateStock} disabled={selectedIds.size === 0 || creating}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
             <ArrowRight className="h-4 w-4"/>Actualizar precios y stock
