@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       const brand = sp.sku ? (odooBrandMap.get(sp.sku) || null) : null;
       const profit = sellPrice - effectiveCost;
 
-      if (profit <= 100) {
+      if (profit < 60) {
         skipped++;
         skippedNoProfit++;
         if (sampleLogged < 5) {
