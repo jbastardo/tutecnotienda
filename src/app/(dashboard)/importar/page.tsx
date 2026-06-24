@@ -84,30 +84,39 @@ export default function ImportarPage() {
     setCreating(true);
     const start = Date.now();
 
+    // Step 1: Create/update products in local DB
     const res = await fetch("/api/productos", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: Array.from(selectedIds) }),
     });
     const data = await res.json();
     if (!res.ok) {
-      addLog({ operation: "Crear y publicar", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false });
+      addLog({ operation: "Crear y publicar", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error });
       setCreating(false);
       return;
     }
 
     const allProducts = [...(data.created || []), ...(data.updated || [])];
+
+    // Step 2: Sync to Sellibri in parallel batches of 5
     let synced = 0;
-    for (const product of allProducts) {
-      const plp = priceList?.products.find(p => p.name === product.name);
-      try {
-        const sr = await fetch("/api/sellibri/sync", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId: product.id, available: plp?.available || 0 }),
-          credentials: "include",
-        });
-        if (sr.ok) synced++;
-      } catch {}
-      await new Promise(r => setTimeout(r, 300));
+    let syncErrors = 0;
+    const batchSize = 5;
+    for (let i = 0; i < allProducts.length; i += batchSize) {
+      const batch = allProducts.slice(i, i + batchSize);
+      const results = await Promise.all(batch.map(async (product: { id: string; name: string }) => {
+        const plp = priceList?.products.find(p => p.name === product.name);
+        try {
+          const sr = await fetch("/api/sellibri/sync", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId: product.id, available: plp?.available || 0 }),
+            credentials: "include",
+          });
+          return sr.ok;
+        } catch { return false; }
+      }));
+      synced += results.filter(Boolean).length;
+      syncErrors += results.filter(r => !r).length;
     }
 
     addLog({
@@ -118,7 +127,7 @@ export default function ImportarPage() {
       synced,
       discontinued: data.discontinued || 0,
       skipped: data.skipped || 0,
-      errors: 0,
+      errors: syncErrors,
       success: true,
     });
     setPriceList(null); setFile(null);
@@ -129,29 +138,38 @@ export default function ImportarPage() {
     if (selectedIds.size === 0) return;
     setCreating(true);
     const start = Date.now();
+
+    const ids = Array.from(selectedIds);
     let updated = 0;
-    for (const id of Array.from(selectedIds)) {
-      const plp = priceList?.products.find(p => p.id === id);
-      if (!plp?.sku) continue;
-      const cr = await fetch(`/api/productos?sku=${encodeURIComponent(plp.sku)}`);
-      const existing = await cr.json();
-      if (Array.isArray(existing) && existing.length > 0) {
-        await fetch("/api/productos", { method: "PUT", headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({ id: existing[0].id, cost: Number(plp.cost), sellPrice: Number(plp.sellPrice), profit: Number(plp.profit) }) });
-        if (existing[0].synced) {
-          try {
-            const sr = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"},
-              body: JSON.stringify({ productId: existing[0].id, available: plp.available || 0 }), credentials: "include" });
-            if (sr.ok) updated++;
-          } catch {}
-        }
-      }
-      await new Promise(r => setTimeout(r, 350));
+    let syncErrors = 0;
+
+    // Process in batches of 5
+    const batchSize = 5;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (id) => {
+        const plp = priceList?.products.find(p => p.id === id);
+        if (!plp?.sku) return;
+        try {
+          const cr = await fetch(`/api/productos?sku=${encodeURIComponent(plp.sku)}`);
+          const existing = await cr.json();
+          if (Array.isArray(existing) && existing.length > 0) {
+            await fetch("/api/productos", { method: "PUT", headers: {"Content-Type":"application/json"},
+              body: JSON.stringify({ id: existing[0].id, cost: Number(plp.cost), sellPrice: Number(plp.sellPrice), profit: Number(plp.profit) }) });
+            if (existing[0].synced) {
+              const sr = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({ productId: existing[0].id, available: plp.available || 0 }), credentials: "include" });
+              if (sr.ok) updated++; else syncErrors++;
+            }
+          }
+        } catch {}
+      }));
     }
+
     addLog({
       operation: `Actualizar precios y stock (${priceList?.supplier.name || "?"})`,
       duration: Date.now() - start,
-      created: 0, updated, synced: updated, discontinued: 0, skipped: selectedIds.size - updated, errors: 0, success: true,
+      created: 0, updated, synced: updated, discontinued: 0, skipped: ids.length - updated, errors: syncErrors, success: true,
     });
     setCreating(false);
   };
