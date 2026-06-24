@@ -83,23 +83,30 @@ export default function ImportarPage() {
   const handleCreateProducts = async () => {
     if (selectedIds.size === 0) return;
     setCreating(true);
-    setProgressDetail("Creando productos en base de datos...");
     const start = Date.now();
 
     try {
       // Step 1: Create/update products in local DB
+      setProgressDetail("Creando productos en base de datos...");
       const res = await fetch("/api/productos", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
       });
       const data = await res.json();
       if (!res.ok) {
-        addLog({ operation: "Crear y publicar", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error });
+        addLog({ operation: "Crear y publicar", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error || `HTTP ${res.status}` });
         return;
       }
 
-      const allProducts = [...(data.created || []), ...(data.updated || [])].filter(p => p && p.id && p.name);
+      const created = Array.isArray(data.created) ? data.created : [];
+      const updatedArr = Array.isArray(data.updated) ? data.updated : [];
+      const allProducts = [...created, ...updatedArr].filter((p: any) => p && p.id);
       const totalToSync = allProducts.length;
+
+      if (totalToSync === 0) {
+        addLog({ operation: "Crear y publicar", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: data.discontinued || 0, skipped: data.skipped || 0, errors: 0, success: true });
+        return;
+      }
 
       // Step 2: Sync to Sellibri in parallel batches of 5
       let synced = 0;
@@ -108,12 +115,12 @@ export default function ImportarPage() {
       for (let i = 0; i < allProducts.length; i += batchSize) {
         const batch = allProducts.slice(i, i + batchSize);
         setProgressDetail(`Sincronizando ${Math.min(i + batchSize, totalToSync)}/${totalToSync} a la web...`);
-        const results = await Promise.all(batch.map(async (product) => {
-          const plp = priceList?.products?.find(p => p.name === product.name);
+        const results = await Promise.all(batch.map(async (product: any) => {
+          if (!product?.id) return false;
           try {
             const sr = await fetch("/api/sellibri/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ productId: product.id, available: plp?.available || 0 }),
+              body: JSON.stringify({ productId: product.id, available: 0 }),
               credentials: "include",
             });
             return sr.ok;
@@ -124,10 +131,10 @@ export default function ImportarPage() {
       }
 
       addLog({
-        operation: `Crear y publicar (${priceList?.supplier.name || "?"})`,
+        operation: "Crear y publicar",
         duration: Date.now() - start,
-        created: data.created?.length || 0,
-        updated: data.updated?.length || 0,
+        created: created.length,
+        updated: updatedArr.length,
         synced,
         discontinued: data.discontinued || 0,
         skipped: data.skipped || 0,
