@@ -13,7 +13,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { name, slug, description, mappings } = body;
+  const { name, slug, description, margin, mappings } = body;
 
   if (!name || !slug) {
     return NextResponse.json({ error: "Nombre y slug requeridos" }, { status: 400 });
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       name,
       slug,
       description: description || null,
+      margin: margin !== undefined ? Number(margin) / 100 : 0.4,
       mappings: {
         create: (mappings || []).map(
           (m: { key: string; columnName: string; columnIndex: number | null; sheetName?: string; skipRows?: number }) => ({

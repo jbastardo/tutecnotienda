@@ -29,6 +29,7 @@ export default function NuevoProveedorPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
+  const [margin, setMargin] = useState("40");
   const [sheetName, setSheetName] = useState("");
   const [skipRows, setSkipRows] = useState(1);
   const [mappings, setMappings] = useState(
@@ -81,7 +82,7 @@ export default function NuevoProveedorPage() {
     const res = await fetch("/api/proveedores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, slug, description, mappings: mappingData }),
+      body: JSON.stringify({ name, slug, description, margin, mappings: mappingData }),
     });
 
     if (res.ok) {
@@ -161,6 +162,22 @@ export default function NuevoProveedorPage() {
                 rows={2}
                 placeholder="Distribuidor de tecnologia..."
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Margen de utilidad (%)
+              </label>
+              <input
+                type="number"
+                value={margin}
+                onChange={(e) => setMargin(e.target.value)}
+                className="mt-1 w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                min={1}
+                max={500}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Se aplica al importar desde Excel o API
+              </p>
             </div>
           </div>
         </div>

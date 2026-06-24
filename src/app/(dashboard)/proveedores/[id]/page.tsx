@@ -17,6 +17,7 @@ interface Supplier {
   name: string;
   slug: string;
   description: string | null;
+  margin: number;
   active: boolean;
   mappings: Mapping[];
 }
@@ -98,6 +99,7 @@ export default function EditarProveedorPage() {
         name: supplier.name,
         active: supplier.active,
         description: supplier.description,
+        margin: Math.round(supplier.margin * 100),
         skipRows,
         sheetName,
         mappings: supplier.mappings
@@ -168,7 +170,23 @@ export default function EditarProveedorPage() {
           Nombre exacto de cada columna en el Excel del proveedor
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Margen de utilidad (%)
+            </label>
+            <input
+              type="number"
+              value={supplier.margin ? Math.round(supplier.margin * 100) : 40}
+              onChange={(e) => setSupplier({ ...supplier, margin: Number(e.target.value) / 100 })}
+              min={1}
+              max={500}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Se aplica al importar desde Excel o API
+            </p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Filas a saltar (cabeceras)

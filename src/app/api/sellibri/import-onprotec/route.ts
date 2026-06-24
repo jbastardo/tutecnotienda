@@ -11,8 +11,7 @@ const ONPROTEC_CONFIG = {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { supplierId, margin = "40", syncOnly = false } = body;
-  const marginPct = Number(margin) / 100;
+  const { supplierId, margin, syncOnly = false } = body;
 
   if (syncOnly) {
     return await syncUnsynced();
@@ -20,15 +19,21 @@ export async function POST(request: Request) {
 
   // Get or create Onprotec supplier
   let effectiveSupplierId = supplierId;
+  let supplier;
   if (!effectiveSupplierId) {
-    let supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
+    supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
     if (!supplier) {
       supplier = await prisma.supplier.create({
-        data: { name: "Onprotec", slug: "onprotec", description: "Productos importados via API de onprotec.com" },
+        data: { name: "Onprotec", slug: "onprotec", description: "Productos importados via API de onprotec.com", margin: 0.4 },
       });
     }
     effectiveSupplierId = supplier.id;
+  } else {
+    supplier = await prisma.supplier.findUnique({ where: { id: effectiveSupplierId } });
   }
+
+  // Use supplier's margin if not provided in request
+  const marginPct = margin !== undefined ? Number(margin) / 100 : Number(supplier?.margin || 0.4);
 
   console.log("[Onprotec] Iniciando import. Sellibri configurado:", isConfigured());
   console.log("[Onprotec] Supplier ID:", effectiveSupplierId);

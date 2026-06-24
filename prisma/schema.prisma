@@ -12,6 +12,7 @@ model Supplier {
   name             String
   slug             String            @unique
   description      String?
+  margin           Decimal           @db.Decimal(5, 4) @default(0.4000)
   active           Boolean           @default(true)
   mappings         ExcelMapping[]
   pricelists       PriceList[]

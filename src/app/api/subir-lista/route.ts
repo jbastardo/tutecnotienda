@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const supplierId = formData.get("supplierId") as string | null;
-    const margin = parseFloat(formData.get("margin") as string) || 0.4;
+    const marginParam = formData.get("margin") as string | null;
 
     if (!file) {
       return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
@@ -15,6 +15,15 @@ export async function POST(request: Request) {
 
     if (!supplierId) {
       return NextResponse.json({ error: "Proveedor requerido" }, { status: 400 });
+    }
+
+    // Use supplier's margin if not provided in form
+    let margin: number;
+    if (marginParam) {
+      margin = parseFloat(marginParam) || 0.4;
+    } else {
+      const supplier = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { margin: true } });
+      margin = Number(supplier?.margin || 0.4);
     }
 
     if (
