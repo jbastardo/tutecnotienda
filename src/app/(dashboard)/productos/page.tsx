@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LayoutGrid, List, Package, Search, Loader2, Download, ExternalLink, Upload } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
-import { calculatePricing, formatBs, formatUsd } from "@/lib/pricing";
 import Link from "next/link";
+import { LayoutGrid, List, Package, Search, Loader2, Download, ExternalLink, Upload, Edit3, RefreshCw } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 interface CatalogProduct {
   id: string; name: string; sku: string | null; description: string | null;
@@ -239,7 +238,7 @@ export default function ProductosPage() {
               <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} className="absolute top-2 right-2 w-3.5 h-3.5" onClick={e => e.stopPropagation()}/>
               {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-32 object-cover rounded-md mb-2" loading="lazy"/>
                 : <div className="w-full h-32 bg-gray-100 rounded-md mb-2 flex items-center justify-center text-gray-300"><Package className="h-8 w-8"/></div>}
-              <p className="text-xs font-semibold text-gray-900 line-clamp-2 mb-1">{p.name}</p>
+              <Link href={`/productos/${p.id}`} className="text-xs font-semibold text-gray-900 line-clamp-2 mb-1 hover:text-blue-600" onClick={e => e.stopPropagation()}>{p.name}</Link>
               {p.sku && <p className="text-xs text-gray-400 font-mono mb-1">{p.sku}</p>}
               {p.brand && <p className="text-xs text-blue-500 mb-0.5">{p.brand}</p>}
               {p.supplier?.name && <p className="text-xs text-gray-400 mb-1">{p.supplier.name}</p>}
@@ -280,7 +279,7 @@ export default function ProductosPage() {
             <tbody className="divide-y">
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 font-medium text-gray-900 max-w-[250px] truncate">{p.name}</td>
+                  <td className="px-3 py-2 max-w-[250px]"><Link href={`/productos/${p.id}`} className="font-medium text-gray-900 hover:text-blue-600 truncate block">{p.name}</Link></td>
                   <td className="px-3 py-2 font-mono text-xs text-gray-500">{p.sku||"-"}</td>
                   <td className="px-3 py-2 text-xs text-gray-500">{p.brand||"-"}</td>
                   <td className="px-3 py-2 text-xs text-gray-500">{p.supplier?.name||"-"}</td>
@@ -291,8 +290,9 @@ export default function ProductosPage() {
                   <td className="px-3 py-2 text-center"><span className={`text-xs px-1.5 py-0.5 rounded ${p.synced?"bg-green-50 text-green-600":"bg-yellow-50 text-yellow-600"}`}>{p.synced?"Publicado":"Pendiente"}</span></td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
-                      <button onClick={() => syncToSellibri(p.id)} disabled={syncing === p.id} className="text-xs text-indigo-500 hover:text-indigo-700">📱</button>
-                      {p.sellibriUrl && <a href={p.sellibriUrl} target="_blank" className="text-blue-500 hover:underline text-xs"><ExternalLink className="h-3 w-3 inline"/></a>}
+                      <Link href={`/productos/${p.id}`} className="text-gray-400 hover:text-blue-600" title="Editar"><Edit3 className="h-3.5 w-3.5"/></Link>
+                      <button onClick={() => syncToSellibri(p.id)} disabled={syncing === p.id} className="text-indigo-500 hover:text-indigo-700" title="Sincronizar"><RefreshCw className={`h-3.5 w-3.5 ${syncing === p.id ? "animate-spin" : ""}`}/></button>
+                      {p.sellibriUrl && <a href={p.sellibriUrl} target="_blank" className="text-blue-500 hover:text-blue-700"><ExternalLink className="h-3.5 w-3.5"/></a>}
                     </div>
                   </td>
                 </tr>

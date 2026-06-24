@@ -77,7 +77,7 @@ export async function POST(request: Request) {
   }
 
   // Create new product in Sellibri
-  const images = await searchProductImages(product.name);
+  const existingImages = product.images && product.images.length > 0 ? product.images : await searchProductImages(product.name);
 
   const result = await createProduct({
     title: product.name,
@@ -85,9 +85,9 @@ export async function POST(request: Request) {
     price: Number(product.sellPrice),
     cost: Number(product.cost),
     sku: product.sku || undefined,
-    vendorName: product.supplier?.name || undefined,
-    images,
-    tags: product.supplier?.name ? [product.supplier.name.toLowerCase(), "tutecnotienda"] : ["tutecnotienda"],
+    vendorName: product.brand || product.supplier?.name || undefined,
+    images: existingImages,
+    tags: product.brand ? [product.brand.toLowerCase(), "tutecnotienda"] : (product.supplier?.name ? [product.supplier.name.toLowerCase(), "tutecnotienda"] : ["tutecnotienda"]),
     status: "active",
   });
 

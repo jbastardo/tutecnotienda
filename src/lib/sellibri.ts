@@ -206,9 +206,11 @@ export async function createProduct(
     const data = await res.json();
 
     if (!res.ok) {
-      console.error("[Sellibri] Error creando producto:", JSON.stringify(data));
+      console.error(`[Sellibri] Error creando producto (${res.status}):`, JSON.stringify(data).slice(0, 500));
       return null;
     }
+
+    console.log(`[Sellibri] Producto creado: ${product.title} (id=${data.product?.id})`);
 
     const masterVariant = data.product?.all_variants?.find(
       (v: { is_master: boolean }) => v.is_master

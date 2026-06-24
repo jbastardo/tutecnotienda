@@ -12,7 +12,7 @@ interface Supplier {
 
 interface PriceListProduct {
   id: string; sku: string | null; name: string; description: string | null;
-  category: string | null; cost: number; sellPrice: number; profit: number;
+  brand: string | null; category: string | null; cost: number; sellPrice: number; profit: number;
   selected: boolean; available: number;
 }
 
@@ -170,16 +170,32 @@ export default function ImportarPage() {
                 {progressMsg || "De Sellibri"}
               </button>
               <button onClick={async () => {
-                if (!confirm("Importar de Onprotec?")) return;
+                if (!confirm("Importar de Onprotec? Esto puede tomar varios minutos.")) return;
                 setProgressMsg("Importando de Onprotec (Precio 4)...");
                 const res = await fetch("/api/sellibri/import-onprotec", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
                 const data = await res.json();
                 setProgressMsg("");
-                alert(res.ok ? `OK: ${data.imported} nuevos, ${data.updated || 0} actualizados` : data.error);
+                if (res.ok) {
+                  alert(`Importados: ${data.imported} nuevos, ${data.updated} actualizados, ${data.synced} sincronizados a la web${data.syncErrors > 0 ? `, ${data.syncErrors} errores` : ""}`);
+                } else { alert(data.error); }
               }} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
                 {progressMsg || "De Onprotec (Precio 4)"}
+              </button>
+              <button onClick={async () => {
+                if (!confirm("Sincronizar productos pendientes a la web?")) return;
+                setProgressMsg("Sincronizando pendientes...");
+                const res = await fetch("/api/sellibri/import-onprotec", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ syncOnly: true }), credentials: "include" });
+                const data = await res.json();
+                setProgressMsg("");
+                if (res.ok) {
+                  alert(`Sincronizados: ${data.synced}, Errores: ${data.errors}`);
+                } else { alert(data.error); }
+              }} disabled={!!progressMsg}
+                className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Upload className="h-4 w-4"/>}
+                {progressMsg || "Sincronizar pendientes"}
               </button>
               <button onClick={async () => {
                 if (!confirm("Importar de Tecnotizacion?")) return;
@@ -228,6 +244,7 @@ export default function ImportarPage() {
                 <th className="w-10 px-3 py-2 text-center text-xs text-gray-500">Sel.</th>
                 <th className="px-3 py-2 text-xs text-gray-600">Producto</th>
                 <th className="px-3 py-2 text-xs text-gray-600">SKU</th>
+                <th className="px-3 py-2 text-xs text-gray-600">Marca</th>
                 <th className="px-3 py-2 text-xs text-gray-600 text-right">Costo</th>
                 <th className="px-3 py-2 text-xs text-gray-600 text-right">Venta</th>
                 <th className="px-3 py-2 text-xs text-gray-600 text-right">Utilidad</th>
@@ -248,6 +265,7 @@ export default function ImportarPage() {
                     </td>
                     <td className="px-3 py-2 font-medium text-gray-900 max-w-[250px] truncate">{p.name}</td>
                     <td className="px-3 py-2 font-mono text-xs text-gray-500">{p.sku || "-"}</td>
+                    <td className="px-3 py-2 text-xs text-blue-600">{p.brand || "-"}</td>
                     <td className="px-3 py-2 text-right text-gray-900">{formatCurrency(Number(p.cost))}</td>
                     <td className="px-3 py-2 text-right font-medium text-green-600">{formatCurrency(Number(p.sellPrice))}</td>
                     <td className="px-3 py-2 text-right font-semibold">

@@ -74,6 +74,9 @@ export async function POST(request: Request) {
         sellPrice: plp.sellPrice,
         profit: plp.profit,
         margin: plp.margin,
+        brand: plp.brand || null,
+        category: plp.category || null,
+        stock: plp.available || 0,
         supplierId: plp.priceList.supplierId,
         status: "draft",
         images: plp.imageUrl ? [plp.imageUrl] : [],
@@ -113,7 +116,7 @@ export async function DELETE(request: Request) {
 
 export async function PUT(request: Request) {
   const body = await request.json();
-  const { id, supplierId, cost, sellPrice, profit } = body;
+  const { id, supplierId, cost, sellPrice, profit, name, description, brand, category, warranty, stock, status, images } = body;
 
   if (!id) {
     return NextResponse.json({ error: "ID requerido" }, { status: 400 });
@@ -124,6 +127,14 @@ export async function PUT(request: Request) {
   if (cost !== undefined) data.cost = cost;
   if (sellPrice !== undefined) data.sellPrice = sellPrice;
   if (profit !== undefined) data.profit = profit;
+  if (name !== undefined) data.name = name;
+  if (description !== undefined) data.description = description;
+  if (brand !== undefined) data.brand = brand;
+  if (category !== undefined) data.category = category;
+  if (warranty !== undefined) data.warranty = warranty;
+  if (stock !== undefined) data.stock = stock;
+  if (status !== undefined) data.status = status;
+  if (images !== undefined) data.images = images;
 
   const product = await prisma.product.update({
     where: { id },
