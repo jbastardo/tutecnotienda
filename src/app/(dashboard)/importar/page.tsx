@@ -180,7 +180,9 @@ export default function ImportarPage() {
     const start = Date.now();
     try {
       const res = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined, credentials: "include" });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any;
+      try { data = JSON.parse(text); } catch { data = { error: text || `HTTP ${res.status} - respuesta vacia` }; }
       const duration = Date.now() - start;
       if (res.ok) {
         addLog({
@@ -191,7 +193,7 @@ export default function ImportarPage() {
           success: true, errorMsg: data.error || undefined,
         });
       } else {
-        addLog({ operation: label, duration, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error || `HTTP ${res.status}` });
+        addLog({ operation: label, duration, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: data.error || text || `HTTP ${res.status}` });
       }
     } catch (e: any) {
       addLog({ operation: label, duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: e.message || "Error de conexion" });
