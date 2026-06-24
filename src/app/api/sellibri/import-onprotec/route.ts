@@ -103,8 +103,8 @@ export async function POST(request: Request) {
           updated++;
         }
 
-        // Sync to Sellibri if: not synced, OR data changed
-        if (sp.sku && (!existing.synced || needsUpdate)) {
+        // Sync to Sellibri if: not synced, OR data changed, AND has stock
+        if (sp.sku && odooStock > 0 && (!existing.synced || needsUpdate)) {
           if (existing.synced && existing.sellibriId) {
             // Already on Sellibri - update product + variant
             const productImages = sp.images.length > 0 ? sp.images : existing.images;
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
       });
       imported++;
 
-      if (sp.sku) {
+      if (sp.sku && odooStock > 0) {
         const ok = await syncProductToSellibri(product.id, {
           title: sp.title, price: sellPrice, cost: effectiveCost, sku: sp.sku, images: sp.images, stock: odooStock,
         });

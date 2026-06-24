@@ -89,6 +89,7 @@ export default function ImportarPage() {
       const ids = Array.from(selectedIds);
       let synced = 0;
       let errors = 0;
+      let skippedNoStock = 0;
       const batchSize = 5;
 
       for (let i = 0; i < ids.length; i += batchSize) {
@@ -96,9 +97,13 @@ export default function ImportarPage() {
         setProgressDetail(`Sincronizando ${Math.min(i + batchSize, ids.length)}/${ids.length} a la web...`);
         const results = await Promise.all(batch.map(async (id) => {
           try {
+            // Get stock from price list product
+            const plp = priceList?.products?.find((p: any) => p && p.id === id);
+            const stock = plp?.available || 0;
+            if (stock <= 0) { skippedNoStock++; return false; }
             const sr = await fetch("/api/sellibri/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ productId: id, available: 0 }),
+              body: JSON.stringify({ productId: id, available: stock }),
               credentials: "include",
             });
             return sr.ok;
@@ -112,6 +117,7 @@ export default function ImportarPage() {
         operation: "Sincronizar todo a la web",
         duration: Date.now() - start,
         created: 0, updated: 0, synced, discontinued: 0, skipped: ids.length - synced, errors, success: true,
+        errorMsg: skippedNoStock > 0 ? `${skippedNoStock} productos sin stock no sincronizados` : undefined,
       });
     } catch (e: any) {
       addLog({ operation: "Sincronizar todo a la web", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: e.message || "Error desconocido" });
@@ -152,6 +158,7 @@ export default function ImportarPage() {
       // Step 2: Sync to Sellibri in parallel batches of 5
       let synced = 0;
       let syncErrors = 0;
+      let skippedNoStock = 0;
       const batchSize = 5;
       for (let i = 0; i < allProducts.length; i += batchSize) {
         const batch = allProducts.slice(i, i + batchSize);
@@ -159,9 +166,13 @@ export default function ImportarPage() {
         const results = await Promise.all(batch.map(async (product: any) => {
           if (!product?.id) return false;
           try {
+            // Get stock from price list product
+            const plp = priceList?.products?.find((p: any) => p && (p.id === product.id || p.name === product.name));
+            const stock = plp?.available || 0;
+            if (stock <= 0) { skippedNoStock++; return false; }
             const sr = await fetch("/api/sellibri/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ productId: product.id, available: 0 }),
+              body: JSON.stringify({ productId: product.id, available: stock }),
               credentials: "include",
             });
             return sr.ok;
@@ -181,6 +192,7 @@ export default function ImportarPage() {
         skipped: data.skipped || 0,
         errors: syncErrors,
         success: true,
+        errorMsg: skippedNoStock > 0 ? `${skippedNoStock} productos sin stock no sincronizados` : undefined,
       });
       setPriceList(null); setFile(null);
     } catch (e: any) {
