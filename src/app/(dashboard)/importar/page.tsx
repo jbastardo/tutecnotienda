@@ -205,7 +205,7 @@ export default function ImportarPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Importar Productos</h1>
-          <p className="text-sm text-gray-500">{priceList.fileName} · {priceList.totalRows} productos · <span className="text-green-600 font-semibold">{priceList.selectedCount} con utilidad &gt; $100</span></p>
+          <p className="text-sm text-gray-500">{priceList.fileName} · {priceList.totalRows} productos · <span className="text-green-600 font-semibold">{priceList.selectedCount} con utilidad &gt; $60</span></p>
           {(priceList as any)._headers && <p className="text-xs text-gray-400 mt-1">Headers: {(priceList as any)._headers.join(" | ")}</p>}
         </div>
         <button onClick={() => setPriceList(null)} className="text-sm text-gray-400 hover:text-gray-600">Cancelar</button>
@@ -251,11 +251,11 @@ export default function ImportarPage() {
                     <td className="px-3 py-2 text-right text-gray-900">{formatCurrency(Number(p.cost))}</td>
                     <td className="px-3 py-2 text-right font-medium text-green-600">{formatCurrency(Number(p.sellPrice))}</td>
                     <td className="px-3 py-2 text-right font-semibold">
-                      <span className={Number(p.profit) > 100 ? "text-blue-600" : "text-gray-400"}>{formatCurrency(Number(p.profit))}</span>
+                      <span className={Number(p.profit) > 60 ? "text-blue-600" : "text-gray-400"}>{formatCurrency(Number(p.profit))}</span>
                     </td>
                     <td className="px-3 py-2 text-center text-gray-700">{p.available > 0 ? p.available : "-"}</td>
                     <td className="px-3 py-2 text-center">
-                      {p.selected ? <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700"><Check className="h-3 w-3"/>&gt; $100</span>
+                      {p.selected ? <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700"><Check className="h-3 w-3"/>Pasa</span>
                         : <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500"><X className="h-3 w-3"/>No pasa</span>}
                     </td>
                   </tr>

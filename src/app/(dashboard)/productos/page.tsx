@@ -10,7 +10,8 @@ interface CatalogProduct {
   id: string; name: string; sku: string | null; description: string | null;
   cost: number; sellPrice: number; profit: number; synced: boolean;
   sellibriId: string | null; sellibriUrl: string | null; status: string;
-  supplier: { id: string; name: string } | null; supplierId: string | null;
+  stock: number; brand: string | null;
+  supplier: { id: string; name: string; slug: string } | null; supplierId: string | null;
   images: string[]; createdAt: string;
 }
 
@@ -85,7 +86,7 @@ export default function ProductosPage() {
     setSyncing(id);
     const res = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
     setSyncing(null);
-    if (res.ok) fetch("/api/productos?synced=true&limit=50&page=1").then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : []));
+    if (res.ok) fetchProducts();
   };
 
   const syncToTecnotizacion = async (id: string) => {
@@ -128,26 +129,26 @@ export default function ProductosPage() {
     else setSelected(new Set(filtered.map(p => p.id)));
   };
 
-  const brands = [...new Set(products.map(p => p.supplier?.name).filter(Boolean))];
+  const brands = [...new Set(products.map(p => p.brand).filter(Boolean))];
 
   const filtered = products.filter(p => {
     if (search) {
       const q = search.toLowerCase();
-      if (!(p.name||"").toLowerCase().includes(q) && !(p.sku||"").toLowerCase().includes(q) && !(p.supplier?.name||"").toLowerCase().includes(q)) return false;
+      if (!(p.name||"").toLowerCase().includes(q) && !(p.sku||"").toLowerCase().includes(q) && !(p.brand||"").toLowerCase().includes(q) && !(p.supplier?.name||"").toLowerCase().includes(q)) return false;
     }
-    if (brandFilter && p.supplier?.name !== brandFilter) return false;
+    if (brandFilter && p.brand !== brandFilter) return false;
     if (supplierFilter && p.supplierId !== supplierFilter) return false;
     if (minPrice && Number(p.sellPrice) < Number(minPrice)) return false;
     if (maxPrice && Number(p.sellPrice) > Number(maxPrice)) return false;
-    if (inStockOnly && Number(p.cost) <= 0) return false;
+    if (inStockOnly && (p.stock ?? 0) <= 0) return false;
     return true;
   });
 
   const exportToExcel = () => {
     const items = selected.size > 0 ? filtered.filter(p => selected.has(p.id)) : filtered;
-    const header = "Nombre\tSKU\tMarca\tCosto\tPrecio Venta\tUtilidad\tPublicado\n";
+    const header = "Nombre\tSKU\tMarca\tProveedor\tCosto\tPrecio Venta\tUtilidad\tStock\tPublicado\n";
     const rows = items.map(p =>
-      `${p.name}\t${p.sku||""}\t${p.supplier?.name||""}\t${p.cost}\t${p.sellPrice}\t${p.profit}\t${p.synced?"Si":"No"}`
+      `${p.name}\t${p.sku||""}\t${p.brand||""}\t${p.supplier?.name||""}\t${p.cost}\t${p.sellPrice}\t${p.profit}\t${p.stock||0}\t${p.synced?"Si":"No"}`
     ).join("\n");
     const blob = new Blob([header + rows], {type: "text/tab-separated-values"});
     const url = URL.createObjectURL(blob);
@@ -180,7 +181,7 @@ export default function ProductosPage() {
         <div className="mb-4 flex items-center gap-6 rounded-lg bg-blue-50 px-4 py-2 text-sm">
           <span className="font-semibold text-blue-800">BCV: Bs {rates.bcv.toFixed(2)}</span>
           <span className="text-blue-700">Paralelo: Bs {rates.promedio.toFixed(2)}</span>
-          <span className="ml-auto text-xs text-blue-500">costo $100 → {40}% → venta ${(100/0.6).toFixed(0)}</span>
+          <span className="ml-auto text-xs text-blue-500">Margen: 40% | Utilidad min: $60</span>
         </div>
       )}
 
@@ -240,7 +241,9 @@ export default function ProductosPage() {
                 : <div className="w-full h-32 bg-gray-100 rounded-md mb-2 flex items-center justify-center text-gray-300"><Package className="h-8 w-8"/></div>}
               <p className="text-xs font-semibold text-gray-900 line-clamp-2 mb-1">{p.name}</p>
               {p.sku && <p className="text-xs text-gray-400 font-mono mb-1">{p.sku}</p>}
+              {p.brand && <p className="text-xs text-blue-500 mb-0.5">{p.brand}</p>}
               {p.supplier?.name && <p className="text-xs text-gray-400 mb-1">{p.supplier.name}</p>}
+              {p.stock > 0 && <p className="text-xs text-green-600 mb-1">Stock: {p.stock}</p>}
               <div className="flex justify-between items-end">
                 <div><p className="text-xs text-gray-400">Costo</p><p className="text-sm font-semibold text-gray-800">{formatCurrency(Number(p.cost))}</p></div>
                 <div className="text-right"><p className="text-xs text-gray-400">Venta</p><p className="text-sm font-bold text-green-600">{formatCurrency(Number(p.sellPrice))}</p></div>
@@ -266,9 +269,11 @@ export default function ProductosPage() {
               <th className="px-3 py-2 text-xs text-gray-600">Producto</th>
               <th className="px-3 py-2 text-xs text-gray-600">SKU</th>
               <th className="px-3 py-2 text-xs text-gray-600">Marca</th>
+              <th className="px-3 py-2 text-xs text-gray-600">Proveedor</th>
               <th className="px-3 py-2 text-xs text-gray-600 text-right">Costo</th>
               <th className="px-3 py-2 text-xs text-gray-600 text-right">Venta</th>
               <th className="px-3 py-2 text-xs text-gray-600 text-right">Utilidad</th>
+              <th className="px-3 py-2 text-xs text-gray-600 text-center">Stock</th>
               <th className="px-3 py-2 text-xs text-gray-600 text-center">Estado</th>
               <th className="px-3 py-2 text-xs text-gray-600"></th>
             </tr></thead>
@@ -277,10 +282,12 @@ export default function ProductosPage() {
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2 font-medium text-gray-900 max-w-[250px] truncate">{p.name}</td>
                   <td className="px-3 py-2 font-mono text-xs text-gray-500">{p.sku||"-"}</td>
+                  <td className="px-3 py-2 text-xs text-gray-500">{p.brand||"-"}</td>
                   <td className="px-3 py-2 text-xs text-gray-500">{p.supplier?.name||"-"}</td>
                   <td className="px-3 py-2 text-right text-gray-900">{formatCurrency(Number(p.cost))}</td>
                   <td className="px-3 py-2 text-right font-medium text-green-600">{formatCurrency(Number(p.sellPrice))}</td>
                   <td className="px-3 py-2 text-right font-semibold text-blue-600">{formatCurrency(Number(p.profit))}</td>
+                  <td className="px-3 py-2 text-center text-xs">{p.stock > 0 ? <span className="text-green-600">{p.stock}</span> : <span className="text-gray-300">-</span>}</td>
                   <td className="px-3 py-2 text-center"><span className={`text-xs px-1.5 py-0.5 rounded ${p.synced?"bg-green-50 text-green-600":"bg-yellow-50 text-yellow-600"}`}>{p.synced?"Publicado":"Pendiente"}</span></td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">

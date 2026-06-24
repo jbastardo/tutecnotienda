@@ -87,11 +87,11 @@ export default async function DashboardPage() {
               No hay productos aun. Sube una lista de precios para empezar.
             </p>
             <Link
-              href="/subir-lista"
+              href="/importar"
               className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               <Upload className="h-4 w-4" />
-              Subir lista
+              Importar productos
             </Link>
           </div>
         ) : (
@@ -103,6 +103,9 @@ export default async function DashboardPage() {
                     Producto
                   </th>
                   <th className="px-4 py-3 font-medium text-gray-600">
+                    Marca
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-600">
                     Proveedor
                   </th>
                   <th className="px-4 py-3 font-medium text-gray-600">
@@ -110,6 +113,9 @@ export default async function DashboardPage() {
                   </th>
                   <th className="px-4 py-3 font-medium text-gray-600">
                     Precio venta
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-600 text-center">
+                    Stock
                   </th>
                   <th className="px-4 py-3 font-medium text-gray-600">
                     Estado
@@ -122,6 +128,9 @@ export default async function DashboardPage() {
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {product.name}
                     </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {(product as any).brand || "—"}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">
                       {product.supplier?.name || "—"}
                     </td>
@@ -130,6 +139,9 @@ export default async function DashboardPage() {
                     </td>
                     <td className="px-4 py-3 font-medium text-green-600">
                       {formatCurrency(Number(product.sellPrice))}
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs">
+                      {(product as any).stock > 0 ? <span className="text-green-600">{(product as any).stock}</span> : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="px-4 py-3">
                       <span

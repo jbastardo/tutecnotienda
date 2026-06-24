@@ -13,9 +13,9 @@ import {
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/proveedores", label: "Proveedores", icon: Truck },
-  { href: "/productos", label: "Productos", icon: Package },
   { href: "/importar", label: "Importar", icon: Upload },
+  { href: "/productos", label: "Productos", icon: Package },
+  { href: "/proveedores", label: "Proveedores", icon: Truck },
 ];
 
 import { cn } from "@/lib/utils";

@@ -25,12 +25,12 @@ export async function GET(request: Request) {
     where.NOT = { sku: { in: skus } };
     where.synced = true;
   }
-  if (minProfit > 0) where.profit = { gte: minProfit };
+  if (minProfit > 0) where.profit = { gt: minProfit };
   if (pubStatus === "pub") where.synced = true;
   if (pubStatus === "pend") where.synced = false;
 
   const take = limit > 0 ? limit : 100;
-  const skip = limit > 0 ? 0 : (page - 1) * 50;
+  const skip = (page - 1) * take;
 
   const products = await prisma.product.findMany({
     where,
