@@ -1,14 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, Check, X, ArrowRight, Loader2, Download, Clock, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-interface Supplier {
-  id: string;
-  name: string;
-  slug: string;
-}
+interface Supplier { id: string; name: string; slug: string; }
 
 interface PriceListProduct {
   id: string; sku: string | null; name: string; description: string | null;
@@ -23,6 +19,12 @@ interface PriceList {
   _headers?: string[]; _errors?: string[];
 }
 
+interface LogEntry {
+  id: string; time: string; operation: string; duration: number;
+  created: number; updated: number; synced: number; discontinued: number;
+  skipped: number; errors: number; success: boolean;
+}
+
 export default function ImportarPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState("");
@@ -32,9 +34,9 @@ export default function ImportarPage() {
   const [priceList, setPriceList] = useState<PriceList | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
-  const [message, setMessage] = useState("");
   const [margin, setMargin] = useState("40");
   const [progressMsg, setProgressMsg] = useState("");
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
     fetch("/api/proveedores").then(r => r.json()).then(setSuppliers);
@@ -45,6 +47,17 @@ export default function ImportarPage() {
       setSelectedIds(new Set(priceList.products.filter(p => p.selected).map(p => p.id)));
     }
   }, [priceList]);
+
+  const addLog = (log: Omit<LogEntry, "id" | "time">) => {
+    const now = new Date();
+    setLogs(prev => [{
+      ...log,
+      id: Date.now().toString(),
+      time: now.toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit", year: "2-digit" }) + " " + now.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    }, ...prev]);
+  };
+
+  const clearLogs = () => setLogs([]);
 
   const toggleProduct = (id: string) => {
     const next = new Set(selectedIds);
@@ -68,13 +81,19 @@ export default function ImportarPage() {
 
   const handleCreateProducts = async () => {
     if (selectedIds.size === 0) return;
-    setCreating(true); setMessage("");
+    setCreating(true);
+    const start = Date.now();
+
     const res = await fetch("/api/productos", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: Array.from(selectedIds) }),
     });
     const data = await res.json();
-    if (!res.ok) { setMessage(data.error || "Error"); setCreating(false); return; }
+    if (!res.ok) {
+      addLog({ operation: "Crear y publicar", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false });
+      setCreating(false);
+      return;
+    }
 
     const allProducts = [...(data.created || []), ...(data.updated || [])];
     let synced = 0;
@@ -90,14 +109,26 @@ export default function ImportarPage() {
       } catch {}
       await new Promise(r => setTimeout(r, 300));
     }
-    setMessage(`${data.created?.length || 0} nuevos, ${data.updated?.length || 0} actualizados, ${data.skipped || 0} sin cambios, ${synced} sincronizados`);
+
+    addLog({
+      operation: `Crear y publicar (${priceList?.supplier.name || "?"})`,
+      duration: Date.now() - start,
+      created: data.created?.length || 0,
+      updated: data.updated?.length || 0,
+      synced,
+      discontinued: data.discontinued || 0,
+      skipped: data.skipped || 0,
+      errors: 0,
+      success: true,
+    });
     setPriceList(null); setFile(null);
     setCreating(false);
   };
 
   const handleUpdateStock = async () => {
     if (selectedIds.size === 0) return;
-    setCreating(true); setMessage("Actualizando...");
+    setCreating(true);
+    const start = Date.now();
     let updated = 0;
     for (const id of Array.from(selectedIds)) {
       const plp = priceList?.products.find(p => p.id === id);
@@ -117,8 +148,37 @@ export default function ImportarPage() {
       }
       await new Promise(r => setTimeout(r, 350));
     }
-    setMessage(`Actualizados: ${updated}`);
+    addLog({
+      operation: `Actualizar precios y stock (${priceList?.supplier.name || "?"})`,
+      duration: Date.now() - start,
+      created: 0, updated, synced: updated, discontinued: 0, skipped: selectedIds.size - updated, errors: 0, success: true,
+    });
     setCreating(false);
+  };
+
+  const runApiImport = async (label: string, url: string, body?: Record<string, unknown>) => {
+    if (!confirm(`${label}?`)) return;
+    setProgressMsg(label);
+    const start = Date.now();
+    try {
+      const res = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined, credentials: "include" });
+      const data = await res.json();
+      const duration = Date.now() - start;
+      if (res.ok) {
+        addLog({
+          operation: label, duration,
+          created: data.imported || 0, updated: data.updated || 0,
+          synced: data.synced || 0, discontinued: data.discontinued || 0,
+          skipped: data.skipped || 0, errors: data.syncErrors || data.errors || 0,
+          success: true,
+        });
+      } else {
+        addLog({ operation: label, duration, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false });
+      }
+    } catch {
+      addLog({ operation: label, duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false });
+    }
+    setProgressMsg("");
   };
 
   const supplier = suppliers.find(s => s.id === selectedSupplier);
@@ -159,62 +219,67 @@ export default function ImportarPage() {
           <div className="rounded-xl border bg-white p-6">
             <h2 className="font-semibold text-gray-900 mb-2">Desde APIs</h2>
             <div className="space-y-2">
-              <button onClick={async () => {
-                if (!confirm("Importar de tutecnotienda.com?")) return;
-                setProgressMsg("Importando de Sellibri...");
-                const res = await fetch("/api/sellibri/import", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
-                const data = await res.json();
-                setProgressMsg("");
-                alert(res.ok ? `OK: ${data.imported} nuevos, ${data.updated || 0} actualizados` : data.error);
-              }} disabled={!!progressMsg}
+              <button onClick={() => runApiImport("Importar de Sellibri", "/api/sellibri/import")} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
-                {progressMsg || "De Sellibri"}
+                {progressMsg === "Importar de Sellibri" ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+                {progressMsg === "Importar de Sellibri" ? progressMsg : "De Sellibri"}
               </button>
-              <button onClick={async () => {
-                if (!confirm("Importar de Onprotec? Esto puede tomar varios minutos.")) return;
-                setProgressMsg("Importando de Onprotec (Precio 4)...");
-                const res = await fetch("/api/sellibri/import-onprotec", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}), credentials: "include" });
-                const data = await res.json();
-                setProgressMsg("");
-                if (res.ok) {
-                  alert(`Importados: ${data.imported} nuevos, ${data.updated} actualizados, ${data.synced} sincronizados${data.discontinued > 0 ? `, ${data.discontinued} dados de baja (sin stock)` : ""}${data.syncErrors > 0 ? `, ${data.syncErrors} errores` : ""}`);
-                } else { alert(data.error); }
-              }} disabled={!!progressMsg}
+              <button onClick={() => runApiImport("Importar de Onprotec", "/api/sellibri/import-onprotec")} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
-                {progressMsg || "De Onprotec (Precio 4)"}
+                {progressMsg === "Importar de Onprotec" ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+                {progressMsg === "Importar de Onprotec" ? progressMsg : "De Onprotec (Precio 4)"}
               </button>
-              <button onClick={async () => {
-                if (!confirm("Sincronizar productos pendientes a la web?")) return;
-                setProgressMsg("Sincronizando pendientes...");
-                const res = await fetch("/api/sellibri/import-onprotec", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ syncOnly: true }), credentials: "include" });
-                const data = await res.json();
-                setProgressMsg("");
-                if (res.ok) {
-                  alert(`Sincronizados: ${data.synced}, Errores: ${data.errors}`);
-                } else { alert(data.error); }
-              }} disabled={!!progressMsg}
+              <button onClick={() => runApiImport("Sincronizar pendientes", "/api/sellibri/import-onprotec", { syncOnly: true })} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Upload className="h-4 w-4"/>}
-                {progressMsg || "Sincronizar pendientes"}
+                {progressMsg === "Sincronizar pendientes" ? <Loader2 className="h-4 w-4 animate-spin"/> : <Upload className="h-4 w-4"/>}
+                {progressMsg === "Sincronizar pendientes" ? progressMsg : "Sincronizar pendientes"}
               </button>
-              <button onClick={async () => {
-                if (!confirm("Importar de Tecnotizacion?")) return;
-                setProgressMsg("Importando de Tecnotizacion...");
-                const res = await fetch("/api/tecnotizacion/import", { method: "POST", credentials: "include" });
-                const data = await res.json();
-                setProgressMsg("");
-                alert(res.ok ? `OK: ${data.imported} locales, ${data.synced} a la web` : data.error);
-              }} disabled={!!progressMsg}
+              <button onClick={() => runApiImport("Importar de Tecnotizacion", "/api/tecnotizacion/import")} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {progressMsg ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
-                {progressMsg || "De Tecnotizacion"}
+                {progressMsg === "Importar de Tecnotizacion" ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+                {progressMsg === "Importar de Tecnotizacion" ? progressMsg : "De Tecnotizacion"}
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Log panel */}
+      {logs.length > 0 && (
+        <div className="mt-6 rounded-xl border bg-white">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <Clock className="h-4 w-4 text-gray-400"/> Historial de operaciones
+            </h3>
+            <button onClick={clearLogs} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1">
+              <Trash2 className="h-3 w-3"/> Limpiar
+            </button>
+          </div>
+          <div className="divide-y">
+            {logs.map(log => (
+              <div key={log.id} className="px-4 py-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${log.success ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+                      {log.success ? <Check className="h-3 w-3"/> : <X className="h-3 w-3"/>}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">{log.operation}</span>
+                  </div>
+                  <span className="text-xs text-gray-400">{log.time} · {(log.duration / 1000).toFixed(1)}s</span>
+                </div>
+                <div className="ml-7 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  {log.created > 0 && <span className="text-green-600">{log.created} creados</span>}
+                  {log.updated > 0 && <span className="text-blue-600">{log.updated} actualizados</span>}
+                  {log.synced > 0 && <span className="text-indigo-600">{log.synced} sincronizados</span>}
+                  {log.discontinued > 0 && <span className="text-orange-600">{log.discontinued} dados de baja</span>}
+                  {log.skipped > 0 && <span className="text-gray-400">{log.skipped} sin cambios</span>}
+                  {log.errors > 0 && <span className="text-red-600">{log.errors} errores</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -289,7 +354,6 @@ export default function ImportarPage() {
       <div className="mt-4 flex items-center justify-between rounded-xl border bg-white p-4">
         <span className="text-sm text-gray-500">{selectedIds.size} de {priceList.totalRows}</span>
         <div className="flex items-center gap-3">
-          {message && <span className={`text-sm ${message.includes("Error") ? "text-red-600" : "text-green-600"}`}>{message}</span>}
           <button onClick={handleUpdateStock} disabled={selectedIds.size === 0 || creating}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
             <ArrowRight className="h-4 w-4"/>Actualizar precios y stock
@@ -301,6 +365,43 @@ export default function ImportarPage() {
           </button>
         </div>
       </div>
+
+      {/* Log panel */}
+      {logs.length > 0 && (
+        <div className="mt-4 rounded-xl border bg-white">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <Clock className="h-4 w-4 text-gray-400"/> Historial de operaciones
+            </h3>
+            <button onClick={clearLogs} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1">
+              <Trash2 className="h-3 w-3"/> Limpiar
+            </button>
+          </div>
+          <div className="divide-y">
+            {logs.map(log => (
+              <div key={log.id} className="px-4 py-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${log.success ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+                      {log.success ? <Check className="h-3 w-3"/> : <X className="h-3 w-3"/>}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">{log.operation}</span>
+                  </div>
+                  <span className="text-xs text-gray-400">{log.time} · {(log.duration / 1000).toFixed(1)}s</span>
+                </div>
+                <div className="ml-7 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  {log.created > 0 && <span className="text-green-600">{log.created} creados</span>}
+                  {log.updated > 0 && <span className="text-blue-600">{log.updated} actualizados</span>}
+                  {log.synced > 0 && <span className="text-indigo-600">{log.synced} sincronizados</span>}
+                  {log.discontinued > 0 && <span className="text-orange-600">{log.discontinued} dados de baja</span>}
+                  {log.skipped > 0 && <span className="text-gray-400">{log.skipped} sin cambios</span>}
+                  {log.errors > 0 && <span className="text-red-600">{log.errors} errores</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
