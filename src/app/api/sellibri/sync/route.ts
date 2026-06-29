@@ -34,8 +34,10 @@ export async function POST(request: Request) {
   });
 
   if (!product) {
-    console.error(`[Sellibri Sync] Producto no encontrado: ${productId}`);
-    return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+    console.error(`[Sellibri Sync] Producto no encontrado: ${productId}. Verificando si existe en DB...`);
+    const count = await prisma.product.count();
+    console.error(`[Sellibri Sync] Total productos en DB: ${count}`);
+    return NextResponse.json({ error: `Producto no encontrado (ID: ${productId}). Total en DB: ${count}` }, { status: 404 });
   }
 
   const stockToUpdate = available ?? 0;

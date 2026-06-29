@@ -96,15 +96,26 @@ export default function ImportarPage() {
       for (let i = 0; i < ids.length; i += batchSize) {
         const batch = ids.slice(i, i + batchSize);
         setProgressDetail(`Sincronizando ${Math.min(i + batchSize, ids.length)}/${ids.length} a la web...`);
-        const results = await Promise.all(batch.map(async (id) => {
+        const results = await Promise.all(batch.map(async (plpId) => {
           try {
-            // Get stock from price list product
-            const plp = priceList?.products?.find((p: any) => p && p.id === id);
-            const stock = plp?.available || 0;
+            // Get price list product
+            const plp = priceList?.products?.find((p: any) => p && p.id === plpId);
+            if (!plp) return { success: false, error: "Producto no encontrado en lista" };
+            
+            const stock = plp.available || 0;
             if (stock <= 0) { skippedNoStock++; return { success: true, error: null, skipped: true }; }
+            
+            // Find actual Product by SKU
+            if (!plp.sku) return { success: false, error: "Sin SKU" };
+            const cr = await fetch(`/api/productos?sku=${encodeURIComponent(plp.sku)}`);
+            const existing = await cr.json();
+            if (!Array.isArray(existing) || existing.length === 0 || !existing[0]?.id) {
+              return { success: false, error: `Producto no encontrado en DB (SKU: ${plp.sku})` };
+            }
+            
             const sr = await fetch("/api/sellibri/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ productId: id, available: stock }),
+              body: JSON.stringify({ productId: existing[0].id, available: stock }),
               credentials: "include",
             });
             if (sr.ok) return { success: true, error: null };
