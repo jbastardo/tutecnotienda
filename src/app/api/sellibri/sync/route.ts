@@ -3,14 +3,23 @@ import { prisma } from "@/lib/prisma";
 import { createProduct, updateProductVariant, updateProductOnSellibri, searchProductBySku, searchProductImages, isConfigured, getStoreDomain } from "@/lib/sellibri";
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch (e: any) {
+    console.error("[Sellibri Sync] Error parsing request body:", e.message);
+    return NextResponse.json({ error: "Body invalido" }, { status: 400 });
+  }
+  
   const { productId, available } = body;
 
   if (!productId) {
+    console.error("[Sellibri Sync] productId requerido");
     return NextResponse.json({ error: "productId requerido" }, { status: 400 });
   }
 
   if (!isConfigured()) {
+    console.error("[Sellibri Sync] Sellibri no configurado - API_KEY:", !!process.env.SELLIBRI_API_KEY, "API_URL:", process.env.SELLIBRI_API_URL);
     return NextResponse.json(
       { error: "Sellibri no configurado" },
       { status: 400 }
@@ -25,22 +34,33 @@ export async function POST(request: Request) {
   });
 
   if (!product) {
+    console.error(`[Sellibri Sync] Producto no encontrado: ${productId}`);
     return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
   }
 
   const stockToUpdate = available ?? 0;
 
+  console.log(`[Sellibri Sync] Procesando producto: ${product.name} (ID: ${productId}, SKU: ${product.sku}, synced: ${product.synced}, sellibriId: ${product.sellibriId})`);
+
   // If already synced, update the existing product on Sellibri
   if (product.synced && product.sellibriId) {
     // Update product details (title, description, vendor, images)
     const productImages = product.images && product.images.length > 0 ? product.images : undefined;
-    await updateProductOnSellibri(product.sellibriId, {
+    const updateResult = await updateProductOnSellibri(product.sellibriId, {
       title: product.name,
       description: product.description || undefined,
       vendorName: product.brand || product.supplier?.name || undefined,
       tags: product.brand ? [product.brand.toLowerCase(), "tutecnotienda"] : (product.supplier?.name ? [product.supplier.name.toLowerCase(), "tutecnotienda"] : ["tutecnotienda"]),
       images: productImages,
     });
+
+    if (!updateResult) {
+      console.error(`[Sellibri Sync] Error al actualizar producto ${product.sellibriId} en Sellibri`);
+      return NextResponse.json(
+        { error: "Error al actualizar producto en Sellibri", sellibriId: product.sellibriId },
+        { status: 500 }
+      );
+    }
 
     // Update variant price/cost/stock
     if (product.sku) {
@@ -54,6 +74,7 @@ export async function POST(request: Request) {
       }
     }
 
+    console.log(`[Sellibri Sync] Producto actualizado: ${product.sellibriId}`);
     return NextResponse.json({ success: true, action: "updated_existing", sellibriId: product.sellibriId });
   }
 
@@ -78,6 +99,7 @@ export async function POST(request: Request) {
         },
       });
 
+      console.log(`[Sellibri Sync] Producto existente encontrado y actualizado: ${existingVariant.product_id}`);
       return NextResponse.json({
         success: true,
         action: "updated_existing",
@@ -103,6 +125,7 @@ export async function POST(request: Request) {
   });
 
   if (!result) {
+    console.error(`[Sellibri Sync] Error al crear producto en Sellibri: ${product.name}`);
     return NextResponse.json(
       { error: "Error al crear producto en Sellibri" },
       { status: 500 }
@@ -126,6 +149,7 @@ export async function POST(request: Request) {
     },
   });
 
+  console.log(`[Sellibri Sync] Producto creado: ${result.id} (${product.name})`);
   return NextResponse.json({
     success: true,
     action: "created",

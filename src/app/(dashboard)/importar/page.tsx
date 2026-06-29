@@ -90,6 +90,7 @@ export default function ImportarPage() {
       let synced = 0;
       let errors = 0;
       let skippedNoStock = 0;
+      let errorMsg: string | undefined;
       const batchSize = 5;
 
       for (let i = 0; i < ids.length; i += batchSize) {
@@ -100,24 +101,32 @@ export default function ImportarPage() {
             // Get stock from price list product
             const plp = priceList?.products?.find((p: any) => p && p.id === id);
             const stock = plp?.available || 0;
-            if (stock <= 0) { skippedNoStock++; return false; }
+            if (stock <= 0) { skippedNoStock++; return { success: true, error: null, skipped: true }; }
             const sr = await fetch("/api/sellibri/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ productId: id, available: stock }),
               credentials: "include",
             });
-            return sr.ok;
-          } catch { return false; }
+            if (sr.ok) return { success: true, error: null };
+            const data = await sr.json().catch(() => ({ error: `HTTP ${sr.status}` }));
+            return { success: false, error: data.error || "Error desconocido" };
+          } catch (e: any) { return { success: false, error: e.message || "Error de conexión" }; }
         }));
-        synced += results.filter(Boolean).length;
-        errors += results.filter(r => !r).length;
+        synced += results.filter(r => r.success && !r.skipped).length;
+        errors += results.filter(r => !r.success).length;
+        // Capture first error for display
+        const firstError = results.find(r => r.error);
+        if (firstError && !errorMsg) errorMsg = firstError.error;
       }
 
       addLog({
         operation: "Sincronizar todo a la web",
         duration: Date.now() - start,
-        created: 0, updated: 0, synced, discontinued: 0, skipped: ids.length - synced, errors, success: true,
-        errorMsg: skippedNoStock > 0 ? `${skippedNoStock} productos sin stock no sincronizados` : undefined,
+        created: 0, updated: 0, synced, discontinued: 0, skipped: skippedNoStock, errors, success: errors === 0,
+        errorMsg: [
+          skippedNoStock > 0 ? `${skippedNoStock} sin stock` : "",
+          errors > 0 ? `${errors} errores de sincronización` : "",
+        ].filter(Boolean).join(", ") || undefined,
       });
     } catch (e: any) {
       addLog({ operation: "Sincronizar todo a la web", duration: Date.now() - start, created: 0, updated: 0, synced: 0, discontinued: 0, skipped: 0, errors: 1, success: false, errorMsg: e.message || "Error desconocido" });
