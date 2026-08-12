@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     try {
       const descriptionToUpdate = product.description || (result.description !== "fallo" ? (await prisma.product.findUnique({where:{id:product.id}}))?.description : undefined);
       if (descriptionToUpdate) {
-        await updateWooProduct(parseInt(product.wooId), { description: descriptionToUpdate });
+        await updateWooProduct(product.wooId, { description: descriptionToUpdate });
         result.woocommerce = "actualizado";
       }
     } catch { result.woocommerce = "error"; }
