@@ -86,8 +86,8 @@ model Product {
   margin      Decimal  @db.Decimal(5, 4) @default(0.4000)
   supplierId  String?
   supplier    Supplier? @relation(fields: [supplierId], references: [id])
-  sellibriId  String?
-  sellibriUrl String?
+  wooId       Int?
+  wooUrl      String?
   synced      Boolean  @default(false)
   images      String[] @default([])
   stock       Int      @default(0)

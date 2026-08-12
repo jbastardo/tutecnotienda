@@ -1,0 +1,251 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { fetchAllProducts } from "@/lib/sellibri";
+import { fetchPricelistPrices, fetchOdooBrands, fetchOdooCategories, fetchOdooStock } from "@/lib/odoo";
+import { createWooProduct, updateWooProduct, getWooProductBySku } from "@/lib/woocommerce";
+
+const ONPROTEC_CONFIG = {
+  apiKey: "2uNyT2EUSyBVXx5yhYBS5AFPSbyhQqCp9MdupF3CyUGv6a9JtB1EtQTbwf7P6fqeLHjjAN2Z8uoMfnMrMv9usFMmwffGNTLeU2qP",
+  apiUrl: "https://onprotec.com/api/v1",
+  storeDomain: "onprotec.com",
+};
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { supplierId, margin, syncOnly = false } = body;
+
+    if (syncOnly) {
+      return await syncUnsynced();
+    }
+
+    // Get or create Onprotec supplier
+    let effectiveSupplierId = supplierId;
+    let supplier;
+    if (!effectiveSupplierId) {
+      supplier = await prisma.supplier.findUnique({ where: { slug: "onprotec" } });
+      if (!supplier) {
+        supplier = await prisma.supplier.create({
+          data: { name: "Onprotec", slug: "onprotec", description: "Productos importados via API de onprotec.com", margin: 0.4 },
+        });
+      }
+      effectiveSupplierId = supplier.id;
+    } else {
+      supplier = await prisma.supplier.findUnique({ where: { id: effectiveSupplierId } });
+    }
+
+    const marginPct = margin !== undefined ? Number(margin) / 100 : Number(supplier?.margin || 0.4);
+
+    console.log("[WooCommerce] Iniciando import Onprotec. Supplier ID:", effectiveSupplierId, "Margen:", marginPct);
+
+    const odooPriceMap = await fetchPricelistPrices("Precio 4");
+    const odooStockMap = await fetchOdooStock();
+    const odooBrandMap = await fetchOdooBrands();
+    
+    // Fetch products from supplier (Onprotec uses Sellibri, so we use fetchAllProducts with their config)
+    const result = await fetchAllProducts(ONPROTEC_CONFIG, (page, total) => {
+      console.log(`[Onprotec] Pagina ${page}/${total}`);
+    });
+
+    if (result.error && result.products.length === 0) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+
+    let imported = 0;
+    let updated = 0;
+    let synced = 0;
+    let syncErrors = 0;
+    let skipped = 0;
+    let skippedNoProfit = 0;
+    let skippedExisting = 0;
+    const processedSkus = new Set<string>();
+
+    for (const sp of result.products) {
+      try {
+        if (sp.sku) processedSkus.add(sp.sku);
+        const odooCost = sp.sku ? odooPriceMap.get(sp.sku) : undefined;
+        const odooStock = sp.sku ? (odooStockMap.get(sp.sku) || 0) : 0;
+        const effectiveCost = odooCost || Number(sp.cost) || 0;
+        const sellPrice = effectiveCost * (1 + marginPct);
+        const brand = sp.sku ? (odooBrandMap.get(sp.sku) || null) : null;
+        const profit = sellPrice - effectiveCost;
+
+        // Find existing product by SKU
+        const existing = sp.sku
+          ? await prisma.product.findFirst({ where: { sku: sp.sku } })
+          : await prisma.product.findFirst({ where: { wooId: sp.sellibriId } });
+
+        if (existing) {
+          const costChanged = Math.abs(Number(existing.cost) - effectiveCost) > 0.01;
+          const stockChanged = (existing.stock ?? 0) !== odooStock;
+          const brandChanged = brand && existing.brand !== brand;
+          const nameChanged = sp.title !== existing.name;
+          const imagesChanged = sp.images.length > 0 && JSON.stringify(sp.images) !== JSON.stringify(existing.images);
+          const needsUpdate = costChanged || stockChanged || brandChanged || nameChanged || imagesChanged;
+
+          if (needsUpdate) {
+            await prisma.product.update({
+              where: { id: existing.id },
+              data: {
+                name: sp.title, cost: effectiveCost, sellPrice, profit, margin: marginPct,
+                stock: odooStock, brand: brand || existing.brand,
+                images: sp.images.length > 0 ? sp.images : existing.images,
+              },
+            });
+            updated++;
+          }
+
+          // Sync to WooCommerce if: not synced, OR data changed, AND has stock
+          if (sp.sku && odooStock > 0 && (!existing.synced || needsUpdate)) {
+            if (existing.synced && existing.wooId) {
+              const productImages = sp.images.length > 0 ? sp.images : existing.images;
+              const ok = await syncProductToWooCommerce(existing.id, {
+                wooId: existing.wooId,
+                title: sp.title, price: sellPrice, cost: effectiveCost, sku: sp.sku, images: productImages, stock: odooStock,
+              });
+              if (ok) synced++; else syncErrors++;
+            } else {
+              const ok = await syncProductToWooCommerce(existing.id, {
+                title: sp.title, price: sellPrice, cost: effectiveCost, sku: sp.sku, images: sp.images, stock: odooStock,
+              });
+              if (ok) synced++; else syncErrors++;
+            }
+          } else if (!needsUpdate) {
+            skipped++;
+            skippedExisting++;
+          }
+          continue;
+        }
+
+        if (profit < 60) {
+          skipped++;
+          skippedNoProfit++;
+          continue;
+        }
+
+        const product = await prisma.product.create({
+          data: {
+            name: sp.title, description: sp.description || null, sku: sp.sku || null,
+            cost: effectiveCost, sellPrice, profit, margin: marginPct, stock: odooStock, brand,
+            supplierId: effectiveSupplierId,
+            synced: false, status: "draft", images: sp.images,
+          },
+        });
+        imported++;
+
+        if (sp.sku && odooStock > 0) {
+          const ok = await syncProductToWooCommerce(product.id, {
+            title: sp.title, price: sellPrice, cost: effectiveCost, sku: sp.sku, images: sp.images, stock: odooStock,
+          });
+          if (ok) synced++; else syncErrors++;
+        }
+      } catch (e: any) {
+        skipped++;
+        console.error(`[WooCommerce] Error: "${sp.title}":`, e.message || e);
+      }
+    }
+
+    console.log(`[WooCommerce] RESULTADO: total=${result.products.length} importado=${imported} actualizado=${updated} sincronizado=${synced} errSync=${syncErrors} saltado=${skipped}`);
+
+    let discontinued = 0;
+    if (processedSkus.size > 0) {
+      const outOfStock = await prisma.product.findMany({
+        where: {
+          supplierId: effectiveSupplierId,
+          sku: { not: null, notIn: Array.from(processedSkus) },
+          stock: { gt: 0 },
+        },
+        select: { id: true, sku: true, name: true, wooId: true },
+      });
+
+      if (outOfStock.length > 0) {
+        await prisma.product.updateMany({
+          where: { id: { in: outOfStock.map(p => p.id) } },
+          data: { stock: 0 },
+        });
+        discontinued = outOfStock.length;
+        
+        // Zero stock in WooCommerce too
+        for (const p of outOfStock) {
+           if (p.wooId) {
+              await updateWooProduct(p.wooId, { stock_quantity: 0, manage_stock: true, stock_status: "outofstock" });
+           }
+        }
+        console.log(`[WooCommerce] ${discontinued} productos dados de baja (sin inventario)`);
+      }
+    }
+
+    return NextResponse.json({
+      total: result.products.length, imported, updated, synced, syncErrors, skipped,
+      skippedNoProfit, skippedExisting, discontinued,
+    });
+
+  } catch (e: any) {
+    console.error("[WooCommerce] Error fatal:", e.message || e);
+    return NextResponse.json({ error: e.message || "Error desconocido en import Onprotec" }, { status: 500 });
+  }
+}
+
+async function syncUnsynced() {
+  const unsynced = await prisma.product.findMany({
+    where: { synced: false, supplier: { slug: "onprotec" }, sku: { not: null } },
+    take: 500,
+  });
+  let synced = 0, errors = 0;
+  for (const p of unsynced) {
+    const ok = await syncProductToWooCommerce(p.id, {
+      wooId: p.wooId || undefined,
+      title: p.name, price: Number(p.sellPrice), cost: Number(p.cost), sku: p.sku!, images: p.images, stock: p.stock ?? 0,
+    });
+    if (ok) synced++; else errors++;
+  }
+  return NextResponse.json({ total: unsynced.length, synced, errors });
+}
+
+async function syncProductToWooCommerce(
+  productId: string,
+  data: { wooId?: number; title: string; price: number; cost: number; sku: string; images: string[]; stock: number }
+): Promise<boolean> {
+  try {
+    const imagesArray = data.images.map((src, i) => ({ src, alt: data.title, position: i }));
+    
+    const wooData = {
+      name: data.title,
+      regular_price: data.price.toString(),
+      sku: data.sku,
+      manage_stock: true,
+      stock_quantity: data.stock,
+      stock_status: data.stock > 0 ? "instock" : "outofstock",
+      images: imagesArray.length > 0 ? imagesArray : undefined,
+    };
+
+    let result;
+    if (data.wooId) {
+      result = await updateWooProduct(data.wooId, wooData);
+    } else {
+      // Check if it already exists by SKU to avoid duplication
+      const existing = await getWooProductBySku(data.sku);
+      if (existing) {
+        result = await updateWooProduct(existing.id, wooData);
+      } else {
+        result = await createWooProduct(wooData);
+      }
+    }
+
+    if (result?.id) {
+      await prisma.product.update({
+        where: { id: productId },
+        data: {
+          synced: true, wooId: result.id,
+          wooUrl: result.permalink,
+          status: "published",
+        },
+      });
+      return true;
+    }
+    return false;
+  } catch (e: any) {
+    console.error(`[WooCommerce] Sync error "${data.title}":`, e.message);
+    return false;
+  }
+}
