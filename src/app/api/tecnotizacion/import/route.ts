@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchProducts, isConfigured } from "@/lib/tecnotizacion";
-import { createProduct, searchProductBySku, isConfigured as isSellibriConfigured, getStoreDomain, generateSlug } from "@/lib/sellibri";
+import { createWooProduct, getWooProductBySku } from "@/lib/woocommerce";
 
 export async function POST() {
   if (!isConfigured()) {
@@ -68,26 +68,24 @@ export async function POST() {
     });
     imported++;
 
-    // Sync to Sellibri
-    if (isSellibriConfigured() && tp.sku) {
-      const existingWeb = await searchProductBySku(tp.sku);
+    // Sync to WooCommerce
+    if (process.env.WOOCOMMERCE_KEY && tp.sku) {
+      const existingWeb = await getWooProductBySku(tp.sku);
       if (!existingWeb) {
-        const result = await createProduct({
-          title: tp.name,
+        const result = await createWooProduct({
+          name: tp.name,
           description: tp.description || "",
-          price: Number(product.sellPrice),
-          cost: Number(product.cost),
+          regular_price: String(product.sellPrice),
           sku: tp.sku,
-          status: "active",
+          status: "publish",
         });
 
-        if (result) {
-          const storeDomain = getStoreDomain();
+        if (result && result.id) {
           await prisma.product.update({
             where: { id: product.id },
             data: {
-              sellibriId: String(result.id),
-              sellibriUrl: `https://${storeDomain}/p/${result.slug || generateSlug(tp.name)}`,
+              wooId: result.id,
+              wooUrl: result.permalink,
               synced: true,
               status: "published",
             },
