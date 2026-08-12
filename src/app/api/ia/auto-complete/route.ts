@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateDescription, searchProductImages } from "@/lib/ia";
-import { isConfigured as isSellibriConfigured } from "@/lib/sellibri";
+import { updateWooProduct } from "@/lib/woocommerce";
 
 export async function GET() {
   const gemini = !!process.env.GEMINI_API_KEY;
@@ -71,27 +71,15 @@ export async function POST(request: Request) {
     result.images = "omitidas";
   }
 
-  // If product is synced to Sellibri, update there too
-  if (product.synced && product.sellibriId && isSellibriConfigured()) {
-    // Update product description via Sellibri API
-    const storeDomain = process.env.SELLIBRI_STORE_DOMAIN ||
-      (process.env.SELLIBRI_API_URL ? new URL(process.env.SELLIBRI_API_URL).hostname : "");
-    
+  // If product is synced to WooCommerce, update there too
+  if (product.synced && product.wooId) {
     try {
-      await fetch(`https://${storeDomain}/api/v1/products/${product.sellibriId}`, {
-        method: "PATCH",
-        headers: {
-          "X-Api-Key": process.env.SELLIBRI_API_KEY || "",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product: {
-            description: product.description || result.description !== "fallo" ? (await prisma.product.findUnique({where:{id:product.id}}))?.description : undefined,
-          },
-        }),
-      });
-      result.sellibri = "actualizado";
-    } catch { result.sellibri = "error"; }
+      const descriptionToUpdate = product.description || (result.description !== "fallo" ? (await prisma.product.findUnique({where:{id:product.id}}))?.description : undefined);
+      if (descriptionToUpdate) {
+        await updateWooProduct(parseInt(product.wooId), { description: descriptionToUpdate });
+        result.woocommerce = "actualizado";
+      }
+    } catch { result.woocommerce = "error"; }
   }
 
   return NextResponse.json(result);
