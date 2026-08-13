@@ -69,6 +69,9 @@ export default function ProductDetailPage() {
   const handleSync = async () => {
     setSyncing(true); setMsg("");
     try {
+      if (hasChanges) {
+        await handleSave();
+      }
       const res = await fetch("/api/woocommerce/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,8 +79,7 @@ export default function ProductDetailPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setMsg(`Sincronizado: ${data.action}`);
-        // Refresh product data
+        setMsg(`Sincronizado con éxito`);
         const updated = await fetch(`/api/productos/${id}`).then(r => r.json());
         setProduct(updated);
         setForm(updated);
