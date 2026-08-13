@@ -43,7 +43,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Tutecnotienda</h1>
           <p className="mt-2 text-sm text-gray-500">
-            Gestion de productos y publicacion en Sellibri
+            Gestion de productos y publicacion en WooCommerce
           </p>
         </div>
 

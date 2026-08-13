@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Tutecnotienda - Gestion de Productos",
-  description: "Sistema de gestion de listas de precios y publicacion en Sellibri",
+  description: "Sistema de gestion de listas de precios y publicacion en WooCommerce",
 };
 
 export default function RootLayout({
