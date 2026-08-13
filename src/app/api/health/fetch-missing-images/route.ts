@@ -18,11 +18,11 @@ export async function GET() {
     // We do it sequentially to not hammer the server/mercado libre
     for (const p of products) {
       try {
-        const images = await searchManufacturerImage(p.name, p.sku || undefined, p.brand || undefined);
-        if (images && images.length > 0) {
+        const img = await searchManufacturerImage(p.brand || "", p.sku || "", p.name);
+        if (img) {
           await prisma.product.update({
             where: { id: p.id },
-            data: { images }
+            data: { images: [img] }
           });
           updated++;
         }
