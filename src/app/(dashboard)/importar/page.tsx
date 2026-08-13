@@ -113,7 +113,7 @@ export default function ImportarPage() {
               return { success: false, error: `Producto no encontrado en DB (SKU: ${plp.sku})` };
             }
             
-            const sr = await fetch("/api/sellibri/sync", {
+            const sr = await fetch("/api/woocommerce/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ productId: existing[0].id, available: stock }),
               credentials: "include",
@@ -190,7 +190,7 @@ export default function ImportarPage() {
             const plp = priceList?.products?.find((p: any) => p && (p.id === product.id || p.name === product.name));
             const stock = plp?.available || 0;
             if (stock <= 0) { skippedNoStock++; return false; }
-            const sr = await fetch("/api/sellibri/sync", {
+            const sr = await fetch("/api/woocommerce/sync", {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ productId: product.id, available: stock }),
               credentials: "include",
@@ -248,7 +248,7 @@ export default function ImportarPage() {
               await fetch("/api/productos", { method: "PUT", headers: {"Content-Type":"application/json"},
                 body: JSON.stringify({ id: existing[0].id, cost: Number(plp.cost || 0), sellPrice: Number(plp.sellPrice || 0), profit: Number(plp.profit || 0) }) });
               if (existing[0].synced) {
-                const sr = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"},
+                const sr = await fetch("/api/woocommerce/sync", { method: "POST", headers: {"Content-Type":"application/json"},
                   body: JSON.stringify({ productId: existing[0].id, available: plp.available || 0 }), credentials: "include" });
                 if (sr.ok) updated++; else syncErrors++;
               }
@@ -346,20 +346,15 @@ export default function ImportarPage() {
           <div className="rounded-xl border bg-white p-6">
             <h2 className="font-semibold text-gray-900 mb-2">Desde APIs</h2>
             <div className="space-y-2">
-              <button onClick={() => runApiImport("Importar de Sellibri", "/api/sellibri/import")} disabled={!!progressMsg}
-                className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                {progressMsg === "Importar de Sellibri" ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
-                {progressMsg === "Importar de Sellibri" ? progressMsg : "De Sellibri"}
-              </button>
-              <button onClick={() => runApiImport("Importar de Onprotec", "/api/sellibri/import-onprotec")} disabled={!!progressMsg}
+              <button onClick={() => runApiImport("Importar de Onprotec", "/api/woocommerce/import-onprotec")} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {progressMsg === "Importar de Onprotec" ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
                 {progressMsg === "Importar de Onprotec" ? progressMsg : "De Onprotec (Precio 4)"}
               </button>
-              <button onClick={() => runApiImport("Sincronizar pendientes", "/api/sellibri/import-onprotec", { syncOnly: true })} disabled={!!progressMsg}
+              <button onClick={() => runApiImport("Sincronizar pendientes", "/api/woocommerce/sync-pending", { syncOnly: true })} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {progressMsg === "Sincronizar pendientes" ? <Loader2 className="h-4 w-4 animate-spin"/> : <Upload className="h-4 w-4"/>}
-                {progressMsg === "Sincronizar pendientes" ? progressMsg : "Sincronizar pendientes"}
+                {progressMsg === "Sincronizar pendientes" ? progressMsg : "Sincronizar pendientes a Woo"}
               </button>
               <button onClick={() => runApiImport("Importar de Tecnotizacion", "/api/tecnotizacion/import")} disabled={!!progressMsg}
                 className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">

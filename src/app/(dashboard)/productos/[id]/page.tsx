@@ -11,7 +11,7 @@ import { formatCurrency } from "@/lib/utils";
 interface Product {
   id: string; name: string; description: string | null; sku: string | null;
   cost: number; sellPrice: number; profit: number; margin: number;
-  supplierId: string | null; sellibriId: string | null; sellibriUrl: string | null;
+  supplierId: string | null; wooId: number | null; wooUrl: string | null;
   synced: boolean; images: string[]; stock: number; brand: string | null;
   category: string | null; warranty: string | null; status: string;
   createdAt: string; updatedAt: string;
@@ -69,7 +69,7 @@ export default function ProductDetailPage() {
   const handleSync = async () => {
     setSyncing(true); setMsg("");
     try {
-      const res = await fetch("/api/sellibri/sync", {
+      const res = await fetch("/api/woocommerce/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId: id }),
@@ -153,12 +153,12 @@ export default function ProductDetailPage() {
           <Globe className="h-3 w-3"/>
           {product.synced ? "Publicado en web" : "No publicado"}
         </span>
-        {product.sellibriUrl && (
-          <a href={product.sellibriUrl} target="_blank" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
-            <ExternalLink className="h-3 w-3"/> Ver en tutecnotienda.com
+        {product.wooUrl && (
+          <a href={product.wooUrl} target="_blank" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+            <ExternalLink className="h-3 w-3"/> Ver en WooCommerce
           </a>
         )}
-        {product.sellibriId && <span className="text-xs text-gray-400">Sellibri ID: {product.sellibriId}</span>}
+        {product.wooId && <span className="text-xs text-gray-400">Woo ID: {product.wooId}</span>}
         <span className="text-xs text-gray-400 ml-auto">Creado: {new Date(product.createdAt).toLocaleDateString("es-VE")}</span>
       </div>
 
@@ -271,8 +271,8 @@ export default function ProductDetailPage() {
                   {product.synced ? "Sincronizado" : "Pendiente"}
                 </span>
               </div>
-              {product.sellibriId && <div className="flex justify-between"><span className="text-gray-500">Sellibri ID:</span><span className="font-mono text-xs">{product.sellibriId}</span></div>}
-              {product.sellibriUrl && <a href={product.sellibriUrl} target="_blank" className="flex items-center gap-1 text-blue-600 hover:underline"><ExternalLink className="h-3 w-3"/> Ver en la web</a>}
+              {product.wooId && <div className="flex justify-between"><span className="text-gray-500">WooCommerce ID:</span><span className="font-mono text-xs">{product.wooId}</span></div>}
+              {product.wooUrl && <a href={product.wooUrl} target="_blank" className="flex items-center gap-1 text-blue-600 hover:underline"><ExternalLink className="h-3 w-3"/> Ver en la web</a>}
             </div>
           </Section>
         </div>

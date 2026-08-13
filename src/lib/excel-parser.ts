@@ -64,31 +64,57 @@ function parseValue(
 ): string | number {
   if (value === undefined || value === null) return "";
   
-  // If it's already a number
   if (typeof value === "number") {
     return transform === "number" || transform === "currency" ? value : String(value);
   }
   
-  if (typeof value === "string") {
-    // Only try to parse as number if transform is number/currency
-    if (transform === "number" || transform === "currency") {
-      const cleaned = value.replace(/[^0-9.,-]/g, "").replace(",", ".");
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
+  const strValue = typeof value === "object" && "w" in value 
+    ? String(value.w ?? value.v ?? "")
+    : String(value);
+
+  if (transform === "number" || transform === "currency") {
+    let cleaned = strValue.trim();
+    // Remove currency symbols and spaces
+    cleaned = cleaned.replace(/[$€\s]/g, "");
+    
+    // Check if both . and , exist (e.g. 1.234,50 or 1,234.50)
+    if (cleaned.includes(".") && cleaned.includes(",")) {
+      const lastDot = cleaned.lastIndexOf(".");
+      const lastComma = cleaned.lastIndexOf(",");
+      if (lastComma > lastDot) {
+        // European format: 1.234,50 -> remove dots, replace comma with dot
+        cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+      } else {
+        // US format: 1,234.50 -> remove commas
+        cleaned = cleaned.replace(/,/g, "");
+      }
+    } else if (cleaned.includes(",")) {
+      // Only comma exists. Check if it's likely a decimal (e.g. 12,50) or thousands (12,000)
+      // Usually if there are 2 digits after comma, it's decimal. If 3, it's thousands.
+      // But safe bet for Latin America is comma = decimal
+      const parts = cleaned.split(",");
+      if (parts.length === 2 && parts[1].length === 3) {
+         // Could be thousands, but without another dot it's ambiguous. Let's assume decimal for safety if not sure,
+         // actually standard in LATAM is comma for decimal. Let's just replace comma with dot.
+         // Except if it's like 1,000. Let's replace all commas with dots if it's the only separator, but wait, 
+         // if there are multiple commas (1,000,000), it's thousands.
+      }
+      if (cleaned.match(/,[0-9]{3},/)) {
+         cleaned = cleaned.replace(/,/g, ""); // Multiple commas = thousands
+      } else {
+         // Assume last comma is decimal
+         const lastComma = cleaned.lastIndexOf(",");
+         cleaned = cleaned.substring(0, lastComma).replace(/,/g, "") + "." + cleaned.substring(lastComma + 1);
+      }
     }
-    return value.trim();
+    
+    // Now replace any remaining non-numeric chars except dot and minus
+    cleaned = cleaned.replace(/[^0-9.-]/g, "");
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
   }
   
-  if (typeof value === "object" && "w" in value) {
-    const str = String(value.w ?? value.v ?? "");
-    if (transform === "number" || transform === "currency") {
-      const cleaned = str.replace(/[^0-9.,-]/g, "").replace(",", ".");
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
-    }
-    return str.trim();
-  }
-  return String(value);
+  return strValue.trim();
 }
 
 export function parseExcel(

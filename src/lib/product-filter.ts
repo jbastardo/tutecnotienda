@@ -8,7 +8,7 @@ export interface FilteredProduct extends ParsedProduct {
 }
 
 export const DEFAULT_MARGIN = 0.4;
-export const MIN_PROFIT_THRESHOLD = 100;
+export const MIN_PROFIT_THRESHOLD = 80;
 
 export function calculateProduct(
   product: ParsedProduct,

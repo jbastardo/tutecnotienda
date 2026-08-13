@@ -3,6 +3,14 @@ import { parseExcel } from "./excel-parser";
 import { processPriceList, DEFAULT_MARGIN } from "./product-filter";
 import type { Prisma } from "@prisma/client";
 
+import { fetchAllProducts } from "./sellibri";
+
+const ONPROTEC_CONFIG = {
+  apiKey: "2uNyT2EUSyBVXx5yhYBS5AFPSbyhQqCp9MdupF3CyUGv6a9JtB1EtQTbwf7P6fqeLHjjAN2Z8uoMfnMrMv9usFMmwffGNTLeU2qP",
+  apiUrl: "https://onprotec.com/api/v1",
+  storeDomain: "onprotec.com",
+};
+
 export async function processUploadedFile(
   supplierId: string,
   fileName: string,
@@ -31,7 +39,41 @@ export async function processUploadedFile(
   }
 
   const margin = customMargin ?? DEFAULT_MARGIN;
-  const processedProducts = processPriceList(products, margin);
+  let processedProducts = processPriceList(products, margin);
+
+  // Fetch Onprotec products to filter out matches (by SKU/Modelo)
+  try {
+    const onprotecRes = await fetchAllProducts(ONPROTEC_CONFIG);
+    if (onprotecRes.products && onprotecRes.products.length > 0) {
+      const onprotecSkus = new Set(
+        onprotecRes.products
+          .filter(p => p.sku)
+          .map(p => p.sku!.trim().toLowerCase())
+      );
+      
+      const onprotecNames = new Set(
+        onprotecRes.products
+          .map(p => p.title.trim().toLowerCase())
+      );
+
+      processedProducts = processedProducts.map(p => {
+        // If profit was > 100, it might be selected. Let's verify against Onprotec.
+        if (p.selected) {
+           const matchSku = p.sku && onprotecSkus.has(p.sku.trim().toLowerCase());
+           // If we don't have SKU, try name matching just in case
+           const matchName = onprotecNames.has(p.name.trim().toLowerCase());
+           
+           if (matchSku || matchName) {
+             p.selected = false;
+             (p as any).notes = "Rechazado: Ya lo vende Onprotec";
+           }
+        }
+        return p;
+      });
+    }
+  } catch (e) {
+    console.error("Error comparando con Onprotec", e);
+  }
 
   const priceList = await prisma.priceList.create({
     data: {

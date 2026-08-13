@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { searchManufacturerImage } from "@/lib/image-search";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -68,6 +69,13 @@ export async function POST(request: Request) {
   const skipped = [];
 
   for (const plp of priceListProducts) {
+    let imageUrl = plp.imageUrl;
+    // Intentar buscar imagen si no tiene
+    if (!imageUrl && plp.brand && plp.sku) {
+      const foundImage = await searchManufacturerImage(plp.brand, plp.sku, plp.name);
+      if (foundImage) imageUrl = foundImage;
+    }
+
     // Check if product already exists by SKU
     const existing = plp.sku
       ? await prisma.product.findFirst({ where: { sku: plp.sku } })
@@ -80,8 +88,9 @@ export async function POST(request: Request) {
       const stockChanged = (existing.stock ?? 0) !== (plp.available || 0);
       const brandChanged = (plp.brand || null) !== existing.brand;
       const nameChanged = plp.name !== existing.name;
+      const imagesChanged = imageUrl && (!existing.images || existing.images.length === 0 || existing.images[0] !== imageUrl);
 
-      if (costChanged || priceChanged || stockChanged || brandChanged || nameChanged) {
+      if (costChanged || priceChanged || stockChanged || brandChanged || nameChanged || imagesChanged) {
         const product = await prisma.product.update({
           where: { id: existing.id },
           data: {
@@ -94,7 +103,7 @@ export async function POST(request: Request) {
             brand: plp.brand || existing.brand,
             category: plp.category || existing.category,
             stock: plp.available || 0,
-            images: plp.imageUrl ? [plp.imageUrl] : existing.images,
+            images: imageUrl ? [imageUrl] : existing.images,
           },
         });
         updated.push(product);
@@ -119,7 +128,7 @@ export async function POST(request: Request) {
         stock: plp.available || 0,
         supplierId: plp.priceList.supplierId,
         status: "draft",
-        images: plp.imageUrl ? [plp.imageUrl] : [],
+        images: imageUrl ? [imageUrl] : [],
         supplierProducts: plp.sku ? {
           create: {
             supplierId: plp.priceList.supplierId,

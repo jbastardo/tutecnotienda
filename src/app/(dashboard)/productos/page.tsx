@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 interface CatalogProduct {
   id: string; name: string; sku: string | null; description: string | null;
   cost: number; sellPrice: number; profit: number; synced: boolean;
-  sellibriId: string | null; sellibriUrl: string | null; status: string;
+  wooId: number | null; wooUrl: string | null; status: string;
   stock: number; brand: string | null;
   supplier: { id: string; name: string; slug: string } | null; supplierId: string | null;
   images: string[]; createdAt: string;
@@ -83,9 +83,9 @@ export default function ProductosPage() {
   // Refetch when filters change
   useEffect(() => { fetchProducts(); }, [minProfit, statusFilter]);
 
-  const syncToSellibri = async (id: string) => {
+  const syncToWoo = async (id: string) => {
     setSyncing(id);
-    const res = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
+    const res = await fetch("/api/woocommerce/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
     setSyncing(null);
     if (res.ok) fetchProducts();
   };
@@ -96,12 +96,12 @@ export default function ProductosPage() {
     setSyncing(null);
   };
 
-  const bulkSyncSellibri = async () => {
+  const bulkSyncWoo = async () => {
     const ids = Array.from(selected);
     let done = 0, errors = 0;
     setSyncMsg(`Publicando ${ids.length}...`);
     for (const id of ids) {
-      const res = await fetch("/api/sellibri/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
+      const res = await fetch("/api/woocommerce/sync", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({productId: id}), credentials: "include" });
       const data = await res.json();
       if (data.success) done++; else errors++;
       setSyncMsg(`${done + errors}/${ids.length} (${errors} err)`);
@@ -224,8 +224,8 @@ export default function ProductosPage() {
           </label>
           {selected.size > 0 && (
             <div className="flex items-center gap-2">
-              <button onClick={bulkSyncSellibri} disabled={!!syncMsg} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 disabled:opacity-50">
-                {syncMsg || `Publicar en Web (${selected.size})`}
+              <button onClick={bulkSyncWoo} disabled={!!syncMsg} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 disabled:opacity-50">
+                {syncMsg || `Publicar en WooCommerce (${selected.size})`}
               </button>
               <button onClick={bulkSyncTecnotizacion} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700">
                 Enviar a Tecnotizacion ({selected.size})
@@ -252,9 +252,9 @@ export default function ProductosPage() {
               <div className="mt-2 pt-2 border-t flex justify-between text-xs">
                 <span className="text-gray-500">Util: {formatCurrency(Number(p.profit))}</span>
                 <div className="flex items-center gap-1">
-                  <button onClick={(e) => { e.stopPropagation(); syncToSellibri(p.id); }}
-                    className="text-indigo-500 hover:text-indigo-700 text-xs" title="Sincronizar">📱</button>
-                  {p.sellibriUrl && <a href={p.sellibriUrl} target="_blank" className="text-blue-500 hover:underline text-xs"><ExternalLink className="h-3 w-3 inline"/></a>}
+                  <button onClick={(e) => { e.stopPropagation(); syncToWoo(p.id); }}
+                    className="text-indigo-500 hover:text-indigo-700 text-xs" title="Sincronizar a WooCommerce">📱</button>
+                  {p.wooUrl && <a href={p.wooUrl} target="_blank" className="text-blue-500 hover:underline text-xs"><ExternalLink className="h-3 w-3 inline"/></a>}
                   <span className={`text-xs px-1.5 py-0.5 rounded ${p.synced ? "bg-green-50 text-green-600" : "bg-yellow-50 text-yellow-600"}`}>
                     {p.synced ? "Pub" : "Pend"}
                   </span>
@@ -293,8 +293,8 @@ export default function ProductosPage() {
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
                       <Link href={`/productos/${p.id}`} className="text-gray-400 hover:text-blue-600" title="Editar"><Edit3 className="h-3.5 w-3.5"/></Link>
-                      <button onClick={() => syncToSellibri(p.id)} disabled={syncing === p.id} className="text-indigo-500 hover:text-indigo-700" title="Sincronizar"><RefreshCw className={`h-3.5 w-3.5 ${syncing === p.id ? "animate-spin" : ""}`}/></button>
-                      {p.sellibriUrl && <a href={p.sellibriUrl} target="_blank" className="text-blue-500 hover:text-blue-700"><ExternalLink className="h-3.5 w-3.5"/></a>}
+                      <button onClick={() => syncToWoo(p.id)} disabled={syncing === p.id} className="text-indigo-500 hover:text-indigo-700" title="Sincronizar a WooCommerce"><RefreshCw className={`h-3.5 w-3.5 ${syncing === p.id ? "animate-spin" : ""}`}/></button>
+                      {p.wooUrl && <a href={p.wooUrl} target="_blank" className="text-blue-500 hover:text-blue-700"><ExternalLink className="h-3.5 w-3.5"/></a>}
                     </div>
                   </td>
                 </tr>
