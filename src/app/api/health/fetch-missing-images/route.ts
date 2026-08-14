@@ -10,7 +10,7 @@ export async function GET() {
       where: {
         images: { isEmpty: true }
       },
-      take: 200
+      take: 20 // PROCESAR DE 20 EN 20 PARA NO ROMPER CLOUDFLARE
     });
 
     let updated = 0;
@@ -26,8 +26,8 @@ export async function GET() {
           });
           updated++;
         }
-        // Esperamos 3 segundos entre cada peticion para no ser bloqueados por anti-bot
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Esperamos 500ms para Bing
+        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err) {
         console.error(`Error fetching image for ${p.name}:`, err);
       }
