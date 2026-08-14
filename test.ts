@@ -1,0 +1,1 @@
+const cheerio = require('cheerio'); fetch('https://images.search.yahoo.com/search/images?p=TCL+43F35', {headers: {'User-Agent': 'Mozilla/5.0'}}).then(r=>r.text()).then(html => { const $ = cheerio.load(html); const img = $('li.ld a img').first().attr('data-src') || $('li.ld a img').first().attr('src'); console.log(img); })

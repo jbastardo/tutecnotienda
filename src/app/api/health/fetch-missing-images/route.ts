@@ -26,6 +26,8 @@ export async function GET() {
           });
           updated++;
         }
+        // Esperamos 3 segundos entre cada peticion para no ser bloqueados por anti-bot
+        await new Promise(resolve => setTimeout(resolve, 3000));
       } catch (err) {
         console.error(`Error fetching image for ${p.name}:`, err);
       }
