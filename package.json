@@ -27,8 +27,6 @@
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "duckduckgo-images-api": "^1.0.5",
-    "googlethis": "^1.8.0",
     "jose": "^5.10.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.4",
