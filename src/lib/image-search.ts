@@ -8,35 +8,11 @@ export async function searchManufacturerImage(
   const query = `${brand} ${model} official product image`;
   console.log(`[ImageSearch] Buscando imagen para: ${query}`);
 
-  // Opcion 1: Google Custom Search (si hay API key)
-  if (process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_CX) {
-    try {
-      const res = await fetch(
-        `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${process.env.GOOGLE_SEARCH_API_KEY}&cx=${process.env.GOOGLE_SEARCH_CX}&searchType=image&imgSize=huge&imgType=photo&safe=active`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const items = data.items || [];
-        if (items.length > 0) {
-          for (const item of items) {
-             const url = item.link;
-             if (url.startsWith("https://")) {
-               console.log(`[ImageSearch] Imagen encontrada via Google: ${url}`);
-               return url;
-             }
-          }
-        }
-      }
-    } catch (e) {
-      console.error("[ImageSearch] Error en Google API:", e);
-    }
-  }
-
-  // Opcion 2: Scraper MercadoLibre (fallback)
+  // Opcion Principal: Bing Image Search Scraper (Evita bloqueos de Google API y MercadoLibre Captchas)
   try {
-    const mlQuery = `${brand} ${model} ${name}`.substring(0, 80).replace(/ /g, '-');
-    console.log(`[ImageSearch] Probando MercadoLibre Scraper: ${mlQuery}`);
-    const res = await fetch(`https://listado.mercadolibre.com.ve/${encodeURIComponent(mlQuery)}`, {
+    const bingQuery = `${brand} ${model} ${name} product image`.substring(0, 100);
+    console.log(`[ImageSearch] Probando Bing Scraper: ${bingQuery}`);
+    const res = await fetch(`https://www.bing.com/images/search?q=${encodeURIComponent(bingQuery)}`, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept-Language": "es-419,es;q=0.9",
@@ -48,22 +24,25 @@ export async function searchManufacturerImage(
       const html = await res.text();
       const $ = cheerio.load(html);
       
-      // Buscar la primera imagen de los resultados
-      const firstImage = $(".ui-search-result-image__element").first();
-      let imgUrl = firstImage.attr("data-src") || firstImage.attr("src");
-      
-      if (imgUrl) {
-        // MercadoLibre retorna miniaturas como -I.jpg o -W.jpg, las reemplazamos por -O.webp o -F.webp (original/full)
-        // Ejemplo: https://http2.mlstatic.com/D_NQ_NP_600557-MLV72314512341_102023-I.webp
-        imgUrl = imgUrl.replace(/^http:\/\//, "https://").replace(/-[A-Z]\.(jpg|png|webp)$/, "-F.$1");
-        console.log(`[ImageSearch] Imagen encontrada via Scraper ML: ${imgUrl}`);
-        return imgUrl;
+      // Buscar la data de la imagen original en Bing (atributo 'm' contiene un JSON con la url original)
+      const mAttr = $("a.iusc").first().attr("m");
+      if (mAttr) {
+        try {
+          const imgData = JSON.parse(mAttr);
+          if (imgData && imgData.murl) {
+             const imgUrl = imgData.murl;
+             console.log(`[ImageSearch] Imagen encontrada via Scraper Bing: ${imgUrl}`);
+             return imgUrl;
+          }
+        } catch (parseError) {
+          console.error("[ImageSearch] Error parseando JSON de Bing:", parseError);
+        }
       }
     } else {
-      console.log(`[ImageSearch] Scraper ML respondio con status: ${res.status}`);
+      console.log(`[ImageSearch] Scraper Bing respondio con status: ${res.status}`);
     }
   } catch (e) {
-    console.error("[ImageSearch] Error en MercadoLibre Scraper:", e);
+    console.error("[ImageSearch] Error en Bing Scraper:", e);
   }
 
   return null;
