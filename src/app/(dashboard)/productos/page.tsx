@@ -9,7 +9,7 @@ interface CatalogProduct {
   id: string; name: string; sku: string | null; description: string | null;
   cost: number; sellPrice: number; profit: number; synced: boolean;
   wooId: number | null; wooUrl: string | null; status: string;
-  stock: number; brand: string | null;
+  stock: number; brand: string | null; category: string | null;
   supplier: { id: string; name: string; slug: string } | null; supplierId: string | null;
   images: string[]; createdAt: string;
 }
@@ -170,6 +170,14 @@ export default function ProductosPage() {
           <button onClick={exportToExcel} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
             <Download className="h-4 w-4"/> Exportar
           </button>
+          <button onClick={async () => {
+            if(!confirm("¿Auto-categorizar todos los productos según reglas de sistema?")) return;
+            setLoading(true);
+            await fetch("/api/productos/categorize", { method: "POST" });
+            await fetchProducts();
+          }} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50 font-medium">
+            ✨ Auto Categorizar
+          </button>
           <Link href="/importar" className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
             <Upload className="h-4 w-4"/> Importar
           </Link>
@@ -243,6 +251,7 @@ export default function ProductosPage() {
               <Link href={`/productos/${p.id}`} className="text-xs font-semibold text-gray-900 line-clamp-2 mb-1 hover:text-blue-600" onClick={e => e.stopPropagation()}>{p.name}</Link>
               {p.sku && <p className="text-xs text-gray-400 font-mono mb-1">{p.sku}</p>}
               {p.brand && <p className="text-xs text-blue-500 mb-0.5">{p.brand}</p>}
+              {p.category && <span className="inline-block px-1.5 py-0.5 mb-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold rounded">{p.category}</span>}
               {p.supplier?.name && <p className="text-xs text-gray-400 mb-1">{p.supplier.name}</p>}
               {p.stock > 0 && <p className="text-xs text-green-600 mb-1">Stock: {p.stock}</p>}
               <div className="flex justify-between items-end">
@@ -270,6 +279,7 @@ export default function ProductosPage() {
               <th className="px-3 py-2 text-xs text-gray-600">Producto</th>
               <th className="px-3 py-2 text-xs text-gray-600">SKU</th>
               <th className="px-3 py-2 text-xs text-gray-600">Marca</th>
+              <th className="px-3 py-2 text-xs text-gray-600">Categoría</th>
               <th className="px-3 py-2 text-xs text-gray-600">Proveedor</th>
               <th className="px-3 py-2 text-xs text-gray-600 text-right">Costo</th>
               <th className="px-3 py-2 text-xs text-gray-600 text-right">Venta</th>
@@ -284,6 +294,7 @@ export default function ProductosPage() {
                   <td className="px-3 py-2 max-w-[250px]"><Link href={`/productos/${p.id}`} className="font-medium text-gray-900 hover:text-blue-600 truncate block">{p.name}</Link></td>
                   <td className="px-3 py-2 font-mono text-xs text-gray-500">{p.sku||"-"}</td>
                   <td className="px-3 py-2 text-xs text-gray-500">{p.brand||"-"}</td>
+                  <td className="px-3 py-2 text-xs font-semibold text-indigo-600">{p.category||"-"}</td>
                   <td className="px-3 py-2 text-xs text-gray-500">{p.supplier?.name||"-"}</td>
                   <td className="px-3 py-2 text-right text-gray-900">{formatCurrency(Number(p.cost))}</td>
                   <td className="px-3 py-2 text-right font-medium text-green-600">{formatCurrency(Number(p.sellPrice))}</td>
