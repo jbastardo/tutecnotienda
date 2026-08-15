@@ -42,3 +42,26 @@ export async function getWooProductBySku(sku: string) {
     return null;
   }
 }
+
+export async function ensureWooCategory(name: string): Promise<number | null> {
+  if (!name) return null;
+  try {
+    // 1. Search if category exists
+    const searchRes = await woocommerce.get("products/categories", { search: name });
+    if (searchRes.data && searchRes.data.length > 0) {
+      // Find exact match (case insensitive)
+      const exactMatch = searchRes.data.find((c: any) => c.name.toLowerCase() === name.toLowerCase());
+      if (exactMatch) return exactMatch.id;
+    }
+
+    // 2. If it doesn't exist, create it
+    const createRes = await woocommerce.post("products/categories", { name });
+    if (createRes.data && createRes.data.id) {
+      return createRes.data.id;
+    }
+    return null;
+  } catch (error: any) {
+    console.error(`[WooCommerce] Error ensuring category ${name}:`, error.response?.data || error.message);
+    return null;
+  }
+}

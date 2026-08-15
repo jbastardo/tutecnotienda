@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createWooProduct, updateWooProduct, getWooProductBySku } from "@/lib/woocommerce";
+import { createWooProduct, updateWooProduct, getWooProductBySku, ensureWooCategory } from "@/lib/woocommerce";
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +26,13 @@ export async function POST(request: Request) {
       position: i,
     }));
 
-    const wooData = {
+    // Resolve category ID in WooCommerce
+    let wooCategoryId = null;
+    if (product.category) {
+      wooCategoryId = await ensureWooCategory(product.category);
+    }
+
+    const wooData: any = {
       name: product.name,
       regular_price: product.sellPrice.toString(),
       sku: product.sku || "",
@@ -36,6 +42,10 @@ export async function POST(request: Request) {
       images: imagesArray.length > 0 ? imagesArray : undefined,
       description: product.description || "",
     };
+
+    if (wooCategoryId) {
+      wooData.categories = [{ id: wooCategoryId }];
+    }
 
     let result;
     if (product.wooId) {
