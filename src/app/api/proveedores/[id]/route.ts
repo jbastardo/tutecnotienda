@@ -24,7 +24,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, description, active, margin, mappings, skipRows, sheetName } = body;
+  const { name, description, active, margin, minProfit, useSuggestedPrice, mappings, skipRows, sheetName } = body;
 
   const supplier = await prisma.supplier.findUnique({ where: { id } });
   if (!supplier) {
@@ -54,6 +54,8 @@ export async function PUT(
       description: description ?? undefined,
       active: active ?? undefined,
       margin: margin !== undefined ? Number(margin) / 100 : undefined,
+      minProfit: minProfit !== undefined ? Number(minProfit) : undefined,
+      useSuggestedPrice: useSuggestedPrice ?? undefined,
     },
     include: { mappings: true },
   });

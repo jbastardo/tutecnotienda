@@ -18,6 +18,8 @@ interface Supplier {
   slug: string;
   description: string | null;
   margin: number;
+  minProfit: number;
+  useSuggestedPrice: boolean;
   active: boolean;
   mappings: Mapping[];
 }
@@ -100,6 +102,8 @@ export default function EditarProveedorPage() {
         active: supplier.active,
         description: supplier.description,
         margin: Math.round(supplier.margin * 100),
+        minProfit: Number(supplier.minProfit),
+        useSuggestedPrice: supplier.useSuggestedPrice,
         skipRows,
         sheetName,
         mappings: supplier.mappings
@@ -213,6 +217,35 @@ export default function EditarProveedorPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
               placeholder="Hoja1"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ganancia Mínima Esperada ($)
+            </label>
+            <input
+              type="number"
+              value={supplier.minProfit ?? 80}
+              onChange={(e) => setSupplier({ ...supplier, minProfit: Number(e.target.value) })}
+              min={0}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Beneficio mínimo requerido para seleccionar el producto.
+            </p>
+          </div>
+          <div className="flex flex-col justify-center mt-6">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={supplier.useSuggestedPrice ?? true}
+                onChange={(e) => setSupplier({ ...supplier, useSuggestedPrice: e.target.checked })}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-5 h-5"
+              />
+              Usar precio sugerido
+            </label>
+            <p className="text-xs text-gray-400 mt-1 ml-7">
+              Si está mapeado, usa el precio del proveedor en lugar del margen.
+            </p>
           </div>
         </div>
 

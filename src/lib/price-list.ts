@@ -38,8 +38,12 @@ export async function processUploadedFile(
     throw new Error(errors.join("; "));
   }
 
-  const margin = customMargin ?? DEFAULT_MARGIN;
-  let processedProducts = processPriceList(products, margin);
+  const margin = customMargin ?? Number(supplier.margin);
+  let processedProducts = processPriceList(products, {
+    margin,
+    minProfit: Number(supplier.minProfit),
+    useSuggestedPrice: supplier.useSuggestedPrice,
+  });
 
   // Fetch Onprotec products to filter out matches (by SKU/Modelo)
   try {

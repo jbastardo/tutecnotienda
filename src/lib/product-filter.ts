@@ -10,12 +10,22 @@ export interface FilteredProduct extends ParsedProduct {
 export const DEFAULT_MARGIN = 0.4;
 export const MIN_PROFIT_THRESHOLD = 80;
 
+export interface CalculationConfig {
+  margin?: number;
+  minProfit?: number;
+  useSuggestedPrice?: boolean;
+}
+
 export function calculateProduct(
   product: ParsedProduct,
-  margin: number = DEFAULT_MARGIN
+  config?: CalculationConfig
 ): FilteredProduct {
-  // Use explicit sellPrice if provided, otherwise calculate from cost
-  const sellPrice = product.sellPrice
+  const margin = config?.margin ?? DEFAULT_MARGIN;
+  const minProfit = config?.minProfit ?? MIN_PROFIT_THRESHOLD;
+  const useSuggestedPrice = config?.useSuggestedPrice ?? true;
+
+  // Use explicit sellPrice if provided AND useSuggestedPrice is true
+  const sellPrice = (useSuggestedPrice && product.sellPrice)
     ? product.sellPrice
     : product.cost * (1 + margin);
   const profit = sellPrice - product.cost;
@@ -25,25 +35,25 @@ export function calculateProduct(
     sellPrice: Math.round(sellPrice * 100) / 100,
     profit: Math.round(profit * 100) / 100,
     margin,
-    selected: profit > MIN_PROFIT_THRESHOLD,
+    selected: profit >= minProfit,
   };
 }
 
 export function filterProducts(
   products: ParsedProduct[],
-  margin: number = DEFAULT_MARGIN,
-  threshold: number = MIN_PROFIT_THRESHOLD
+  config?: CalculationConfig
 ): FilteredProduct[] {
+  const minProfit = config?.minProfit ?? MIN_PROFIT_THRESHOLD;
   return products
-    .map((p) => calculateProduct(p, margin))
-    .filter((p) => p.profit > threshold);
+    .map((p) => calculateProduct(p, config))
+    .filter((p) => p.profit >= minProfit);
 }
 
 export function processPriceList(
   products: ParsedProduct[],
-  margin: number = DEFAULT_MARGIN
+  config?: CalculationConfig
 ): FilteredProduct[] {
   return products
-    .map((p) => calculateProduct(p, margin))
+    .map((p) => calculateProduct(p, config))
     .sort((a, b) => b.profit - a.profit);
 }
